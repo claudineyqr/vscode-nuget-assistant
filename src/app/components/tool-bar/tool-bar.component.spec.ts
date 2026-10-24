@@ -17,6 +17,7 @@ describe('ToolBarComponent', () => {
   const packageManagerMock = {
     currentSources: sources.asObservable(),
     currentCategory: category.asObservable(),
+    preferredSourceUrl: undefined as string | undefined,
     queryForPackages: jest.fn(),
     changeShowOnlyVulnerable: jest.fn(),
   };
@@ -25,6 +26,7 @@ describe('ToolBarComponent', () => {
   beforeEach(async () => {
     sources.next([]);
     category.next(Category.Browse);
+    packageManagerMock.preferredSourceUrl = undefined;
     jest.clearAllMocks();
 
     await TestBed.configureTestingModule({
@@ -63,5 +65,56 @@ describe('ToolBarComponent', () => {
       ALL_PACKAGE_SOURCES,
       updatedSource,
     ]);
+  });
+
+  it('restores the saved source by URL when package sources load', () => {
+    const savedSource: PackageSource = {
+      name: 'Renamed feed',
+      url: 'https://packages.example.test/v3/index.json',
+      authorizationHeader: undefined,
+    };
+    packageManagerMock.preferredSourceUrl = savedSource.url;
+
+    sources.next([{ ...savedSource, name: 'Current feed name' }]);
+
+    expect(component.searchForm.get('source')?.value).toEqual({ ...savedSource, name: 'Current feed name' });
+    expect(packageManagerMock.queryForPackages).toHaveBeenLastCalledWith('', false, { ...savedSource, name: 'Current feed name' });
+    expect(vscodeServiceMock.postMessage).not.toHaveBeenCalledWith({ command: 'select-source', sourceUrl: '' });
+  });
+
+  it('restores All when the saved source is no longer configured', () => {
+    packageManagerMock.preferredSourceUrl = 'https://removed.example.test/v3/index.json';
+
+    sources.next([{ name: 'Current feed', url: 'https://current.example.test/v3/index.json', authorizationHeader: undefined }]);
+
+    expect(component.searchForm.get('source')?.value).toBe(ALL_PACKAGE_SOURCES);
+    expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith({ command: 'select-source', sourceUrl: '' });
+  });
+
+  it('saves the selected source URL when the user changes the selection', () => {
+    const source: PackageSource = {
+      name: 'Private feed',
+      url: 'https://packages.example.test/v3/index.json',
+      authorizationHeader: undefined,
+    };
+    sources.next([source]);
+    vscodeServiceMock.postMessage.mockClear();
+
+    component.searchForm.get('source')?.setValue(source);
+
+    expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith({ command: 'select-source', sourceUrl: source.url });
+  });
+
+  it('restores the All selection saved as an empty URL', () => {
+    packageManagerMock.preferredSourceUrl = '';
+    const source: PackageSource = {
+      name: 'Private feed',
+      url: 'https://packages.example.test/v3/index.json',
+      authorizationHeader: undefined,
+    };
+
+    sources.next([source]);
+
+    expect(component.searchForm.get('source')?.value).toBe(ALL_PACKAGE_SOURCES);
   });
 });

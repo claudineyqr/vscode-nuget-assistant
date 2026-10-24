@@ -9,21 +9,21 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('nuget-assistant.managePackages', (uri: vscode.Uri) => {
-      UiPanel.createOrShow(context.extensionPath, uri, outputChannel);
+      UiPanel.createOrShow(context.extensionPath, uri, outputChannel, context.workspaceState);
     }),
     vscode.commands.registerCommand('nuget-assistant.managePackagesPalette', async () => {
       const projectFileUri = await quickPick.pickProjectFile();
       if (projectFileUri) {
-        UiPanel.createOrShow(context.extensionPath, projectFileUri, outputChannel);
+        UiPanel.createOrShow(context.extensionPath, projectFileUri, outputChannel, context.workspaceState);
       }
     }),
     vscode.commands.registerCommand('nuget-assistant.manageSolutionPackages', (uri: vscode.Uri) => {
-      UiPanel.createOrShow(context.extensionPath, uri, outputChannel);
+      UiPanel.createOrShow(context.extensionPath, uri, outputChannel, context.workspaceState);
     }),
     vscode.commands.registerCommand('nuget-assistant.manageSolutionPackagesPalette', async () => {
       const solutionFileUri = await quickPick.pickSolutionFile();
       if (solutionFileUri) {
-        UiPanel.createOrShow(context.extensionPath, solutionFileUri, outputChannel);
+        UiPanel.createOrShow(context.extensionPath, solutionFileUri, outputChannel, context.workspaceState);
       }
     })
   );

@@ -32,12 +32,14 @@ export default class WebviewMessageHandler {
   private readonly nuGetConfigLoader: NuGetConfigLoader;
   private readonly taskManager: TaskManager;
   private readonly taskName = 'nuget-assistant';
+  private static readonly selectedSourceKey = 'nuget-assistant.selectedSourceUrl';
   private configuredSources: Awaited<ReturnType<NuGetConfigLoader['loadAsync']>> = [];
 
   public constructor(
     private readonly webview: vscode.Webview,
     private readonly projectFilePath: string,
-    private readonly outputChannel: vscode.OutputChannel
+    private readonly outputChannel: vscode.OutputChannel,
+    private readonly workspaceState: vscode.Memento
   ) {
     this.projectFileLoader = new ProjectFileLoader();
     this.solutionLoader = new SolutionLoader(this.projectFileLoader);
@@ -78,6 +80,9 @@ export default class WebviewMessageHandler {
         return;
       case 'reload-sources':
         this.loadConfiguration();
+        return;
+      case 'select-source':
+        void this.saveSelectedSource(message.sourceUrl);
         return;
       case 'nuget-diagnostic':
         if (typeof message.message === 'string') {
@@ -187,7 +192,19 @@ export default class WebviewMessageHandler {
           this.log(`Skipped ${sources.length - safeSources.length} NuGet source(s) with unsupported protocols or credentials in the URL.`);
         }
         const publicSources = redactPackageSourceCredentials(safeSources);
-        const message: ExtensionMessage = { type: 'sources', data: publicSources };
+        const preferredSourceUrl = this.workspaceState.get<unknown>(WebviewMessageHandler.selectedSourceKey);
+        let selectedSourceUrl: string | undefined;
+        if (typeof preferredSourceUrl === 'string') {
+          selectedSourceUrl = preferredSourceUrl === '' || safeSources.some((source) => source.url === preferredSourceUrl)
+            ? preferredSourceUrl
+            : '';
+          if (selectedSourceUrl !== preferredSourceUrl) {
+            void this.workspaceState.update(WebviewMessageHandler.selectedSourceKey, selectedSourceUrl);
+          }
+        } else if (preferredSourceUrl !== undefined) {
+          void this.workspaceState.update(WebviewMessageHandler.selectedSourceKey, undefined);
+        }
+        const message: ExtensionMessage = { type: 'sources', data: publicSources, selectedSourceUrl };
 
         this.webview.postMessage(message);
       })
@@ -195,6 +212,16 @@ export default class WebviewMessageHandler {
         this.log(`Error loading NuGet.Config: ${this.getErrorMessage(error)}`);
         vscode.window.showErrorMessage(`Error loading NuGet.Config: ${this.getErrorMessage(error)}`);
       });
+  }
+
+  private async saveSelectedSource(sourceUrl: unknown): Promise<void> {
+    if (typeof sourceUrl !== 'string' || sourceUrl.length > 2048) {
+      return;
+    }
+    if (sourceUrl !== '' && !this.configuredSources.some((source) => source.url === sourceUrl)) {
+      return;
+    }
+    await this.workspaceState.update(WebviewMessageHandler.selectedSourceKey, sourceUrl);
   }
 
   private log(message: string): void {

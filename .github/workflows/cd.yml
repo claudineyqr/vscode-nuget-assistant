@@ -39,7 +39,7 @@ jobs:
         run: |
           set -o pipefail
           npx semantic-release --dry-run --branches main --plugins "@semantic-release/commit-analyzer" "@semantic-release/release-notes-generator" "@semantic-release/changelog" "@semantic-release/github" 2>&1 | tee semantic-release.log
-          VERSION=$(perl -ne 's/\e\[[0-9;]*[[:alpha:]]//g; print "$1\n" if /The next release version is (\S+)/' semantic-release.log | tail -n 1)
+          VERSION=$(perl -ne 's/\e\[[0-9;]*[[:alpha:]]//g; print "$1\n" if /the next release version is (\S+)/i' semantic-release.log | tail -n 1)
           if [[ -z "$VERSION" ]]; then
             if grep -q "There are no relevant changes, so no new version is released" semantic-release.log; then
               echo "No release is needed for these commits."

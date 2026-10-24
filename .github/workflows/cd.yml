@@ -73,7 +73,7 @@ jobs:
 
       - name: Update version in package.json
         run: |
-          npm version "${VERSION#v}" --no-git-tag-version
+          npm version "${VERSION#v}" --no-git-tag-version --allow-same-version
           echo "Updated package.json to version $VERSION"
 
       - name: Install dependencies

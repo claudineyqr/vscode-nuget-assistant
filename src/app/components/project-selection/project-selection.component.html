@@ -1,0 +1,22 @@
+<section *ngIf="projects.length > 1" class="project-selection" [class.with-version]="showVersion">
+  <div class="project-header">
+    <span></span>
+    <span>Project</span>
+    <span *ngIf="showVersion">Version</span>
+    <span>Installed</span>
+  </div>
+  <label class="select-all-option">
+    <input type="checkbox" [checked]="areAllSelected" (change)="toggleAll($event)" />
+    <span>Select all projects</span>
+  </label>
+  <label *ngFor="let project of projects" class="project-option">
+    <input
+      type="checkbox"
+      [checked]="isSelected(project.fsPath)"
+      (change)="toggle(project.fsPath, $event)"
+    />
+    <span>{{ project.name }}</span>
+    <span *ngIf="showVersion">{{ getPackageVersion(project) }}</span>
+    <span>{{ getInstalledVersion(project) }}</span>
+  </label>
+</section>

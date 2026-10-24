@@ -127,4 +127,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npx semantic-release --branches main --plugins "@semantic-release/commit-analyzer" "@semantic-release/release-notes-generator" "@semantic-release/changelog" "@semantic-release/github"
-          gh release upload "$VERSION" vsix/*.vsix --clobber
+          gh release upload "v${VERSION#v}" vsix/*.vsix --clobber

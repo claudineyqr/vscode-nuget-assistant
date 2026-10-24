@@ -1,0 +1,178 @@
+{
+  "name": "nuget-assistant",
+  "displayName": "NuGet Assistant",
+  "description": "Manage NuGet packages graphically in VS Code. Search, install, update, and remove packages from .NET projects and solutions.",
+  "version": "1.0.0",
+  "icon": "images/logo.png",
+  "publisher": "claudineyqr",
+  "author": {
+    "name": "Claudiney Queiroz",
+    "url": "https://github.com/claudineyqr"
+  },
+  "engines": {
+    "vscode": "^1.65.0"
+  },
+  "main": "./dist/src/extension/extension.js",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "nuget",
+    "package",
+    "packages",
+    "manager",
+    "manage",
+    "dotnet",
+    "c#",
+    "csharp",
+    "explorer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/claudineyqr/vscode-nuget-assistant.git"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "NuGet Assistant reads project and feed configuration files and runs dotnet package operations."
+    }
+  },
+  "activationEvents": [
+    "onCommand:nuget-assistant.managePackages",
+    "onCommand:nuget-assistant.managePackagesPalette",
+    "onCommand:nuget-assistant.manageSolutionPackages",
+    "onCommand:nuget-assistant.manageSolutionPackagesPalette"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "nuget-assistant.managePackages",
+        "title": "NuGet Assistant: Manage Project Packages"
+      },
+      {
+        "command": "nuget-assistant.managePackagesPalette",
+        "title": "NuGet Assistant: Manage Project Packages"
+      },
+      {
+        "command": "nuget-assistant.manageSolutionPackages",
+        "title": "NuGet Assistant: Manage Solution Packages"
+      },
+      {
+        "command": "nuget-assistant.manageSolutionPackagesPalette",
+        "title": "NuGet Assistant: Manage Solution Packages"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "nuget-assistant.managePackages",
+          "when": "false"
+        },
+        {
+          "command": "nuget-assistant.managePackagesPalette"
+        },
+        {
+          "command": "nuget-assistant.manageSolutionPackagesPalette"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceExtname == .csproj || resourceExtname == .vbproj || resourceExtname == .fsproj",
+          "command": "nuget-assistant.managePackages",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceExtname == .sln || resourceExtname == .slnx",
+          "command": "nuget-assistant.manageSolutionPackages",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NuGet Assistant",
+      "properties": {
+        "nuget-assistant.allowInsecureHttpCredentials": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "Allow NuGet source credentials to be sent over unencrypted HTTP connections. Enable only for trusted package sources and network environments."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build --configuration development && tsc -p tsconfig.ext.json",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "package-ext": "webpack --mode production --devtool hidden-source-map",
+    "angular-prod": "ng build --configuration production",
+    "package-all": "npm run angular-prod && npm run package-ext",
+    "vscode:prepublish": "npm run package-all",
+    "lint": "ng lint",
+    "test": "jest",
+    "test-coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "overrides": {
+    "@azure/msal-node": "7.1.0",
+    "js-yaml": "^4.1.0",
+    "sprintf-js": "^1.1.3",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@angular/animations": "^22.2.3",
+    "@angular/common": "^22.2.3",
+    "@angular/compiler": "^22.2.3",
+    "@angular/core": "^22.2.3",
+    "@angular/forms": "^22.2.3",
+    "@angular/platform-browser": "^22.2.3",
+    "@angular/platform-browser-dynamic": "^22.2.3",
+    "@angular/router": "^22.2.3",
+    "@fortawesome/angular-fontawesome": "^5.1.0",
+    "@fortawesome/fontawesome-svg-core": "~6.6.0",
+    "@fortawesome/free-solid-svg-icons": "^6.6.0",
+    "angular-split": "^17.2.0",
+    "compare-versions": "^6.1.1",
+    "rxjs": "~7.8.1",
+    "tslib": "^2.3.0",
+    "xml2js": "^0.6.2",
+    "zone.js": "~0.16.0"
+  },
+  "devDependencies": {
+    "@angular-eslint/builder": "^22.6.0",
+    "@angular-eslint/eslint-plugin": "^22.6.0",
+    "@angular-eslint/eslint-plugin-template": "^22.6.0",
+    "@angular-eslint/schematics": "^22.6.0",
+    "@angular-eslint/template-parser": "^22.6.0",
+    "@angular/build": "^22.2.3",
+    "@angular/cli": "^22.2.3",
+    "@angular/compiler-cli": "^22.2.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.3.0",
+    "@types/vscode": "^1.65.0",
+    "@types/xml2js": "^0.4.14",
+    "@typescript-eslint/eslint-plugin": "^8.1.0",
+    "@typescript-eslint/parser": "^8.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "angular-eslint": "^22.6.0",
+    "eslint": "^9.9.0",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "jest-preset-angular": "^17.0.3",
+    "ts-loader": "^9.5.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "webpack": "^5.69.1",
+    "webpack-cli": "^5.1.4"
+  },
+  "jest": {
+    "preset": "jest-preset-angular",
+    "testPathIgnorePatterns": ["<rootDir>/dist/", "<rootDir>/node_modules/"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/setup-jest.ts"
+    ]
+  }
+}

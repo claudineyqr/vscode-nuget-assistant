@@ -1,0 +1,56 @@
+.project-selection {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 8px 12px;
+
+  .title {
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .project-header,
+  .project-option {
+    align-items: center;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 90px;
+    gap: 6px;
+    margin: 4px 0;
+  }
+
+  &.with-version {
+    .project-header,
+    .project-option {
+      grid-template-columns: 16px minmax(0, 1fr) 90px 90px;
+    }
+  }
+
+  .project-header {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+
+  .project-option span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .select-all-option {
+    align-items: center;
+    display: flex;
+    gap: 6px;
+    margin: 4px 0;
+  }
+
+  .select-all-option {
+    border-bottom: 1px solid var(--vscode-panel-border);
+    font-weight: 600;
+    padding-bottom: 6px;
+  }
+
+  input[type='checkbox'] {
+    block-size: 16px;
+    inline-size: 16px;
+    margin: 0;
+  }
+}

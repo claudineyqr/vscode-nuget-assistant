@@ -1,0 +1,63 @@
+<app-loading-spinner *ngIf="isLoading"></app-loading-spinner>
+<div *ngIf="package" class="package-details">
+  <div class="header">
+    <div class="icon">
+      <img *ngIf="package.iconUrl" [src]="package.iconUrl" />
+      <fa-icon class="placeholder-icon" *ngIf="!package.iconUrl" icon="cubes"></fa-icon>
+    </div>
+    <div class="name">{{ package.id }}</div>
+  </div>
+  <app-project-selection [packageToChange]="package"></app-project-selection>
+  <div class="version-selection">
+    <div *ngIf="package.isInstalled" class="version-container">
+      <span class="label">Installed:</span>
+      <span class="drop-down installed-version-display">{{ package.installedVersion }}</span>
+      <button class="button" (click)="uninstall()">Uninstall</button>
+    </div>
+    <div class="version-container">
+      <span class="label">Version:</span>
+      <select class="drop-down" [formControl]="selectedVersion">
+        <option *ngFor="let version of package.versions" [ngValue]="version">{{ version.version }}</option>
+      </select>
+      <button class="button" (click)="install()">{{ package.isInstalled ? 'Update' : 'Install' }}</button>
+    </div>
+  </div>
+  <ng-container *ngIf="selectedVersionObject">
+    <app-package-details-vulnerabilities [vulnerabilities]="selectedVersionObject.vulnerabilities"></app-package-details-vulnerabilities>
+    <div class="description">
+      <p class="label">Description</p>
+      <pre class="description-text">{{ selectedVersionObject.description }}</pre>
+    </div>
+    <div class="details">
+      <div class="details-row">
+        <span class="label">Version:</span>
+        <span class="content">{{ selectedVersionObject.version }}</span>
+      </div>
+      <div *ngIf="selectedVersionObject.authors" class="details-row">
+        <span class="label">Author(s):</span>
+        <span class="content">{{ selectedVersionObject.authors }}</span>
+      </div>
+      <div *ngIf="selectedVersionObject.licenseUrl" class="details-row">
+        <span class="label">License:</span>
+        <span class="content"
+          ><a [href]="selectedVersionObject.licenseUrl">{{ selectedVersionObject.licenseUrl }}</a></span
+        >
+      </div>
+      <div *ngIf="selectedVersionObject.published" class="details-row">
+        <span class="label">Date published:</span>
+        <span class="content">{{ selectedVersionObject.published | date }}</span>
+      </div>
+      <div *ngIf="selectedVersionObject.projectUrl" class="details-row">
+        <span class="label">Project url:</span>
+        <span class="content"
+          ><a [href]="selectedVersionObject.projectUrl">{{ selectedVersionObject.projectUrl }}</a></span
+        >
+      </div>
+      <div *ngIf="selectedVersionObject.tags" class="details-row">
+        <span class="label">Tags:</span>
+        <span class="content">{{ selectedVersionObject.tags }}</span>
+      </div>
+      <app-package-details-dependencies [dependencyGroups]="selectedVersionObject.dependencyGroups"></app-package-details-dependencies>
+    </div>
+  </ng-container>
+</div>

@@ -1,0 +1,66 @@
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.button {
+  font-size: 0.75rem;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: var(--vscode-button-border);
+  padding: 0.25rem 0.5rem;
+
+  &:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
+
+  &.secondary {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+
+    &:hover {
+      background-color: var(--vscode-button-secondaryHoverBackground);
+    }
+  }
+
+  &:disabled {
+    background-color: darkgray;
+  }
+}
+
+.drop-down {
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  color: var(--vscode-dropdown-foreground);
+  font-family: var(--vscode-font-family);
+  font-weight: var(--vscode-font-weight);
+  font-size: var(--vscode-font-size);
+  padding: 0.25rem;
+
+  &:focus {
+    outline-color: var(--vscode-focusBorder);
+  }
+}
+
+input {
+  &:focus {
+    outline-color: var(--vscode-focusBorder);
+  }
+}
+
+.ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkbox-with-label {
+  align-self: center;
+  display: flex;
+  align-items: flex-start;
+
+  label {
+    margin-left: 0.5rem;
+  }
+}

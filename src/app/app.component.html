@@ -1,0 +1,16 @@
+<div class="layout">
+  <section class="header">
+    <app-nav-bar></app-nav-bar>
+    <app-tool-bar></app-tool-bar>
+  </section>
+  <section class="main-section">
+    <as-split direction="horizontal" [gutterSize]="5">
+      <as-split-area [size]="60" [minSize]="20">
+        <app-package-list></app-package-list>
+      </as-split-area>
+      <as-split-area [size]="40" [minSize]="20">
+        <app-package-details></app-package-details>
+      </as-split-area>
+    </as-split>
+  </section>
+</div>

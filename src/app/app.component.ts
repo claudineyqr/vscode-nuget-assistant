@@ -23,7 +23,7 @@ export class AppComponent {
     } else if (message.type === 'project-set') {
       this.packageManager.changeCurrentProjectSet(message.data as ProjectSet);
     } else if (message.type === 'sources') {
-      this.packageManager.changeCurrentSources(message.data as PackageSource[]);
+      this.packageManager.changeCurrentSources(message.data as PackageSource[], message.selectedSourceUrl);
     }
   }
 }

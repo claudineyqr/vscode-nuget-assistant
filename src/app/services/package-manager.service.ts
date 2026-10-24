@@ -15,6 +15,7 @@ import { ALL_PACKAGE_SOURCES, NUGET_ORG } from '../models/constants';
 })
 export class PackageManagerService {
   private _currentSources = new BehaviorSubject<PackageSource[]>([]);
+  private _preferredSourceUrl: string | undefined;
   public get currentSources(): Observable<PackageSource[]> {
     return this._currentSources.asObservable();
   }
@@ -161,7 +162,12 @@ export class PackageManagerService {
     this._selectedProjectPaths.next(projectPaths);
   }
 
-  public changeCurrentSources(sources: PackageSource[]): void {
+  public get preferredSourceUrl(): string | undefined {
+    return this._preferredSourceUrl;
+  }
+
+  public changeCurrentSources(sources: PackageSource[], selectedSourceUrl?: string): void {
+    this._preferredSourceUrl = selectedSourceUrl;
     this._currentSources.next(sources);
   }
 

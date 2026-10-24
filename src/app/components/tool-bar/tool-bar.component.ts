@@ -4,6 +4,7 @@ import { debounceTime } from 'rxjs/operators';
 import { ALL_PACKAGE_SOURCES, NUGET_ORG } from '../../models/constants';
 import { Category } from '../../models/category';
 import { PackageSource } from '../../../shared/models/package-source';
+import { SelectSourceMessage } from '../../../shared/models/ui-message';
 import { PackageManagerService } from '../../services/package-manager.service';
 
 import { BaseComponent } from '../base-component';
@@ -22,6 +23,7 @@ export class ToolBarComponent extends BaseComponent implements OnInit {
   public currentCategory = Category.Browse;
 
   public readonly searchForm: UntypedFormGroup;
+  private hasReceivedSources = false;
 
   constructor(private packageManager: PackageManagerService, private fb: UntypedFormBuilder, private vscodeService: VscodeService) {
     super();
@@ -55,23 +57,40 @@ export class ToolBarComponent extends BaseComponent implements OnInit {
   private listenForSourcesChanges(): void {
     this.subscriptions.add(
       this.packageManager.currentSources.subscribe((newSources) => {
+        const isSourceUpdate = this.hasReceivedSources;
+        this.hasReceivedSources = true;
         this.packageSources = [ALL_PACKAGE_SOURCES, ...(newSources.length > 0 ? newSources : [NUGET_ORG])];
 
         this.updateSelectedSource();
+        if (isSourceUpdate) {
+          this.refresh();
+        }
       })
     );
   }
 
   private updateSelectedSource(): void {
     const selectedSource = this.searchForm.get('source')?.value as PackageSource | undefined;
-    const matchingSource = this.packageSources.find((source) => source.url === selectedSource?.url) ?? this.packageSources[0];
+    const preferredSourceUrl = this.packageManager.preferredSourceUrl;
+    const preferredSourceExists = preferredSourceUrl !== undefined && this.packageSources.some((source) => source.url === preferredSourceUrl);
+    const matchingSource = preferredSourceUrl !== undefined
+      ? this.packageSources.find((source) => source.url === preferredSourceUrl) ?? this.packageSources[0]
+      : this.packageSources.find((source) => source.url === selectedSource?.url) ?? this.packageSources[0];
     if (matchingSource !== selectedSource) {
       this.searchForm.get('source')?.setValue(matchingSource, { emitEvent: false });
+    }
+    if (preferredSourceUrl !== undefined && !preferredSourceExists) {
+      this.vscodeService.postMessage({ command: 'select-source', sourceUrl: matchingSource.url } as SelectSourceMessage);
     }
   }
 
   private listenForFormChanges(): void {
     this.subscriptions.add(this.searchForm.valueChanges.pipe(debounceTime(500)).subscribe(() => this.refresh()));
+    this.subscriptions.add(
+      this.searchForm.get('source')?.valueChanges.subscribe((source: PackageSource) => {
+        this.vscodeService.postMessage({ command: 'select-source', sourceUrl: source.url } as SelectSourceMessage);
+      })
+    );
   }
 
   private listenForCategoryChanges() {

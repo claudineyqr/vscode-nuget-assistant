@@ -2,6 +2,11 @@ export interface UIMessage {
   command: string;
 }
 
+export interface SelectSourceMessage extends UIMessage {
+  command: 'select-source';
+  sourceUrl: string;
+}
+
 export interface NuGetDiagnosticMessage extends UIMessage {
   command: 'nuget-diagnostic';
   message: string;

@@ -75,6 +75,31 @@ describe('NuGetConfigLoader', () => {
     ]);
   });
 
+  it('reads NuGet.Config from the current platform user profile using the real filesystem', async () => {
+    const userProfileFolder = path.join(temporaryFolder, 'user-profile');
+    const userNuGetFolder = process.platform === 'win32'
+      ? path.join(userProfileFolder, 'AppData', 'Roaming', 'NuGet')
+      : path.join(userProfileFolder, '.nuget', 'NuGet');
+    const configPath = path.join(userNuGetFolder, 'NuGet.Config');
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    const sourceUrl = 'https://profile.example/v3/index.json';
+
+    await writeConfig(
+      configPath,
+      `<configuration><packageSources><add key="profile" value="${sourceUrl}" /></packageSources></configuration>`
+    );
+    await fs.promises.writeFile(projectFilePath, '');
+
+    const environment: NodeJS.ProcessEnv = process.platform === 'win32'
+      ? { APPDATA: path.dirname(userNuGetFolder) }
+      : { HOME: userProfileFolder };
+    const loader = new NuGetConfigLoader(environment);
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      { name: 'profile', url: sourceUrl, authorizationHeader: undefined },
+    ]);
+  });
+
   it('creates a Basic authorization header from clear text credentials', async () => {
     await writeConfig(
       path.join(appDataFolder, 'NuGet', 'NuGet.Config'),

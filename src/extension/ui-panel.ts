@@ -15,7 +15,12 @@ export default class UiPanel {
   private readonly webviewMessageHandler: WebviewMessageHandler;
   private disposables: vscode.Disposable[] = [];
 
-  public static createOrShow(extensionPath: string, projectFileUri: vscode.Uri, outputChannel: vscode.OutputChannel) {
+  public static createOrShow(
+    extensionPath: string,
+    projectFileUri: vscode.Uri,
+    outputChannel: vscode.OutputChannel,
+    workspaceState: vscode.Memento
+  ) {
     const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined;
 
     const projectFilePath = projectFileUri.fsPath;
@@ -25,7 +30,13 @@ export default class UiPanel {
     if (existingPanel) {
       existingPanel.panel.reveal(column);
     } else {
-      UiPanel.currentPanels[projectFilePath] = new UiPanel(extensionPath, column || vscode.ViewColumn.One, projectFileUri, outputChannel);
+      UiPanel.currentPanels[projectFilePath] = new UiPanel(
+        extensionPath,
+        column || vscode.ViewColumn.One,
+        projectFileUri,
+        outputChannel,
+        workspaceState
+      );
     }
     return UiPanel.currentPanels;
   }
@@ -34,7 +45,8 @@ export default class UiPanel {
     extensionPath: string,
     column: vscode.ViewColumn,
     projectFileUri: vscode.Uri,
-    outputChannel: vscode.OutputChannel
+    outputChannel: vscode.OutputChannel,
+    workspaceState: vscode.Memento
   ) {
     this.extensionPath = extensionPath;
     this.builtAppFolder = 'dist';
@@ -51,7 +63,12 @@ export default class UiPanel {
 
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
-    this.webviewMessageHandler = new WebviewMessageHandler(this.panel.webview, this.projectFileUri.fsPath, outputChannel);
+    this.webviewMessageHandler = new WebviewMessageHandler(
+      this.panel.webview,
+      this.projectFileUri.fsPath,
+      outputChannel,
+      workspaceState
+    );
   }
 
   private dispose() {

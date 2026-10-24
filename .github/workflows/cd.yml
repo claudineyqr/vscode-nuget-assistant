@@ -1,11 +1,9 @@
 name: Release
 
 on:
-  pull_request_target:
+  push:
     branches:
       - main
-    types:
-      - closed
 
 permissions:
   contents: write
@@ -16,7 +14,6 @@ jobs:
   prepare-release:
     name: Determine release version
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:

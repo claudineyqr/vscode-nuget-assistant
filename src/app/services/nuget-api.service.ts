@@ -12,7 +12,7 @@ import { PackageSearchResult, SearchResults } from '../models/search-results';
 import { VersionService } from './version.service';
 import { VscodeService } from './vscode.service';
 
-type SourceApi = { protocol: 'v2'; endpoint: string } | { protocol: 'v3'; endpoint: string };
+type SourceApi = { protocol: 'v2'; endpoint: string } | { protocol: 'v3'; endpoint: string; flatContainerEndpoint?: string };
 type V2FeedPage = { entries: CatalogEntry[]; nextUrl?: string };
 
 @Injectable({
@@ -77,7 +77,7 @@ export class NuGetApiService {
       switchMap((api) =>
         api.protocol === 'v2'
           ? this.searchV2PackageIds(packageIds, query, prerelease, source, api.endpoint)
-          : this.executeMetadataGets(packageIds, query, prerelease, api.endpoint, requestHeaders, source.url)
+          : this.executeMetadataGets(packageIds, query, prerelease, api.endpoint, requestHeaders, source.url, api.flatContainerEndpoint)
       ),
       catchError((error: unknown) => {
         this.logDiagnostic(`Version lookup for source "${source.name}" failed: ${this.getErrorMessage(error)}`);
@@ -110,21 +110,56 @@ export class NuGetApiService {
     includePrerelease: boolean,
     metaApiUrl: string,
     authHeaders: HttpHeaders,
-    sourceUrl: string
+    sourceUrl: string,
+    flatContainerEndpoint?: string
   ): Observable<PackageRowModel[]> {
     const requests = packageIds.map((packageId) => {
       const metaApiFullUrl = new URL(`${packageId.toLowerCase()}/index.json`, metaApiUrl).toString();
       return this.request<PackageMetaResponse>(metaApiFullUrl, { headers: authHeaders }, 'V3 package registration', sourceUrl)
         .pipe(
           catchError(() => of(null)),
-          switchMap((packageMeta) => this.getRegistrationLeafs(packageMeta, authHeaders, sourceUrl)),
-          map((registrationLeafs) => this.getFilteredAndSortedCatalogEntries(registrationLeafs, includePrerelease)),
+          switchMap((packageMeta) => {
+            if (Array.isArray(packageMeta?.items)) {
+              return this.getRegistrationLeafs(packageMeta, authHeaders, sourceUrl);
+            }
+            if (flatContainerEndpoint) {
+              this.logDiagnostic(`V3 package registration did not include an items array; using the flat container for ${packageId}.`);
+              return this.getFlatContainerEntries(packageId, flatContainerEndpoint, authHeaders, sourceUrl);
+            }
+            this.logDiagnostic(`V3 package registration did not include an items array for ${packageId}.`);
+            return of(null);
+          }),
+          map((registrationLeafs) => Array.isArray(registrationLeafs) ? this.getFilteredAndSortedCatalogEntries(registrationLeafs, includePrerelease) : null),
           map((catalogEntries) => this.convertCatalogEntriesToPackageRow(catalogEntries, packageId, sourceUrl))
         );
     });
 
     return forkJoin(requests).pipe(
       map((packageRowResults) => this.filterAndSortPackageRowResults(packageRowResults, query))
+    );
+  }
+
+  private getFlatContainerEntries(
+    packageId: string,
+    flatContainerEndpoint: string,
+    authHeaders: HttpHeaders,
+    sourceUrl: string
+  ): Observable<RegistrationLeaf[] | null> {
+    const versionsUrl = new URL(`${packageId.toLowerCase()}/index.json`, flatContainerEndpoint).toString();
+    return this.request<PackageMetaResponse & { versions?: string[] }>(versionsUrl, { headers: authHeaders }, 'V3 flat container versions', sourceUrl).pipe(
+      switchMap((response) => {
+        if (Array.isArray(response?.items)) {
+          return this.getRegistrationLeafs(response, authHeaders, sourceUrl);
+        }
+        const versions = Array.isArray(response?.versions) ? response.versions : [];
+        return of(versions.map((version) => ({
+          '@id': '',
+          catalogEntry: {
+            '@id': '', id: packageId, version, description: '', authors: '', iconUrl: '', licenseUrl: '', projectUrl: '', tags: '',
+            dependencyGroups: undefined, published: '', listed: true, vulnerabilities: undefined,
+          },
+        })));
+      })
     );
   }
 
@@ -209,11 +244,13 @@ export class NuGetApiService {
           throw new Error(`The package source "${sourceUrl}" is not a valid NuGet V2 or V3 feed.`);
         }
 
-        const found = index.resources?.find((resource: ApiResource) => preferredEndpoints.includes(resource['@type']));
+        const resources = index.resources ?? [];
+        const found = resources.find((resource: ApiResource) => preferredEndpoints.includes(resource['@type']));
         if (!found) {
           throw new Error(`The package source "${sourceUrl}" does not expose the required NuGet V3 resource.`);
         }
-        return { protocol: 'v3', endpoint: found['@id'] } as SourceApi;
+        const flatContainer = resources.find((resource: ApiResource) => resource['@type'].startsWith('PackageBaseAddress/'));
+        return { protocol: 'v3', endpoint: found['@id'], flatContainerEndpoint: flatContainer?.['@id'] } as SourceApi;
       })
     );
   }

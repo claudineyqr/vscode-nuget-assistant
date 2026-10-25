@@ -20,6 +20,7 @@ describe('ToolBarComponent', () => {
     preferredSourceUrl: undefined as string | undefined,
     queryForPackages: jest.fn(),
     changeShowOnlyVulnerable: jest.fn(),
+    cancelOngoingRequests: jest.fn(),
   };
   const vscodeServiceMock = { postMessage: jest.fn() };
 
@@ -103,6 +104,7 @@ describe('ToolBarComponent', () => {
     component.searchForm.get('source')?.setValue(source);
 
     expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith({ command: 'select-source', sourceUrl: source.url });
+    expect(packageManagerMock.cancelOngoingRequests).toHaveBeenCalledTimes(1);
   });
 
   it('restores the All selection saved as an empty URL', () => {

@@ -44,3 +44,5 @@ Thumbs.db
 *.vsix
 .npm-cache/
 .npm-cache-secure/
+
+nupkg/

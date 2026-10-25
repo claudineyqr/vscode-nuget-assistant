@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of, skip, take, throwError, zip } from 'rxjs';
+import { of, skip, Subject, take, throwError, zip } from 'rxjs';
 import { Category } from '../models/category';
 import { PackageRowModel } from '../models/package-row-model';
 import { PackageSource } from '../../shared/models/package-source';
@@ -40,6 +40,25 @@ describe('PackageManagerService', () => {
 
   test('should be created', () => {
     expect(service).toBeTruthy();
+  });
+
+  test('cancelOngoingRequests unsubscribes pending searches and package detail lookups', () => {
+    const source = getMockPackageSource();
+    const pendingSearch = new Subject<PackageRowModel[]>();
+    const pendingDetails = new Subject<PackageRowModel[]>();
+    nugetApiServiceMock.search.mockReturnValue(pendingSearch);
+    nugetApiServiceMock.searchByPackageIds.mockReturnValue(pendingDetails);
+
+    service.queryForPackages('', false, source);
+    service.changeCurrentSelectedPackage(getMockApiPackages()[0]);
+
+    expect(pendingSearch.observed).toBe(true);
+    expect(pendingDetails.observed).toBe(true);
+
+    service.cancelOngoingRequests();
+
+    expect(pendingSearch.observed).toBe(false);
+    expect(pendingDetails.observed).toBe(false);
   });
 
   test('changeCurrentSources should emit new sources', (done) => {

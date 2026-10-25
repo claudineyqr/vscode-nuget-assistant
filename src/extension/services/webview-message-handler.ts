@@ -6,6 +6,7 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import * as dns from 'node:dns';
 import * as path from 'node:path';
+import { decodeNuGetResponseBody } from './nuget-response';
 
 import NuGetConfigLoader from './nuget-config-loader';
 import ProjectFileLoader from './project-file-loader';
@@ -25,6 +26,11 @@ import {
   validateProjectTargets,
 } from './security-validation';
 
+interface ActiveNuGetRequest {
+  cancelled: boolean;
+  connections: Set<http.ClientRequest>;
+}
+
 export default class WebviewMessageHandler {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly projectFileLoader: ProjectFileLoader;
@@ -34,6 +40,7 @@ export default class WebviewMessageHandler {
   private readonly taskName = 'nuget-assistant';
   private static readonly selectedSourceKey = 'nuget-assistant.selectedSourceUrl';
   private configuredSources: Awaited<ReturnType<NuGetConfigLoader['loadAsync']>> = [];
+  private readonly activeNuGetRequests = new Map<string, ActiveNuGetRequest>();
 
   public constructor(
     private readonly webview: vscode.Webview,
@@ -64,10 +71,10 @@ export default class WebviewMessageHandler {
   }
 
   private handleMessage(message: unknown): void {
-    if (!isRecord(message) || typeof message.command !== 'string') {
+    if (!isRecord(message) || typeof message['command'] !== 'string') {
       return;
     }
-    switch (message.command) {
+    switch (message['command']) {
       case 'add-package':
         this.addPackage(message as unknown as InstallMessage);
         return;
@@ -82,11 +89,12 @@ export default class WebviewMessageHandler {
         this.loadConfiguration();
         return;
       case 'select-source':
-        void this.saveSelectedSource(message.sourceUrl);
+        this.cancelActiveNuGetRequests();
+        void this.saveSelectedSource(message['sourceUrl']);
         return;
       case 'nuget-diagnostic':
-        if (typeof message.message === 'string') {
-          this.log(this.getErrorMessage(message.message));
+        if (typeof message['message'] === 'string') {
+          this.log(this.getErrorMessage(message['message']));
         }
         return;
       case 'nuget-http-request':
@@ -245,27 +253,54 @@ export default class WebviewMessageHandler {
       }
       return;
     }
+    const activeRequest: ActiveNuGetRequest = { cancelled: false, connections: new Set() };
+    this.activeNuGetRequests.set(message.requestId, activeRequest);
     try {
       const configuredSource = this.configuredSources.find((source) => source.url === message.sourceUrl);
-      const response = await this.requestText(requestedUrl, sourceUrl, message.headers, configuredSource?.authorizationHeader);
+      const response = await this.requestText(requestedUrl, sourceUrl, message.headers, activeRequest, configuredSource?.authorizationHeader);
+      if (activeRequest.cancelled) {
+        return;
+      }
       this.webview.postMessage({ type: 'nuget-http-response', requestId: message.requestId, ...response });
       this.log(`NuGet HTTP ${response.statusCode} ${this.sanitizeUrl(message.url)}`);
     } catch (error) {
+      if (activeRequest.cancelled) {
+        return;
+      }
       const details = this.getErrorMessage(error);
       this.webview.postMessage({ type: 'nuget-http-response', requestId: message.requestId, statusCode: 0, error: details });
       this.log(`NuGet HTTP failed in ${this.sanitizeUrl(message.url)}: ${details}`);
+    } finally {
+      if (this.activeNuGetRequests.get(message.requestId) === activeRequest) {
+        this.activeNuGetRequests.delete(message.requestId);
+      }
     }
+  }
+
+  private cancelActiveNuGetRequests(): void {
+    for (const activeRequest of this.activeNuGetRequests.values()) {
+      activeRequest.cancelled = true;
+      for (const connection of activeRequest.connections) {
+        connection.destroy(new Error('NuGet request cancelled.'));
+      }
+      activeRequest.connections.clear();
+    }
+    this.activeNuGetRequests.clear();
   }
 
   private async requestText(
     url: URL,
     sourceUrl: URL,
     headers: Record<string, string>,
+    activeRequest: ActiveNuGetRequest,
     authorizationHeader?: string,
     redirects = 0,
     originalOrigin = url.origin,
     authorizationAllowed = url.origin === sourceUrl.origin
   ): Promise<{ statusCode: number; statusMessage?: string; body: string }> {
+    if (activeRequest.cancelled) {
+      throw new Error('NuGet request cancelled.');
+    }
     if (redirects > 5) {
       throw new Error('Too many redirects while contacting the NuGet source.');
     }
@@ -280,6 +315,9 @@ export default class WebviewMessageHandler {
     assertHttpCredentialsAllowed(url, sendAuthorization, allowInsecureHttpCredentials);
     const hostname = url.hostname.replace(/^\[|\]$/g, '');
     const addresses = await dns.promises.lookup(hostname, { all: true, verbatim: true });
+    if (activeRequest.cancelled) {
+      throw new Error('NuGet request cancelled.');
+    }
     const selectedAddress = selectRequestAddress(addresses, sameOriginAsSource);
     if (!selectedAddress) {
       throw new Error('The NuGet source host could not be resolved.');
@@ -288,11 +326,12 @@ export default class WebviewMessageHandler {
     const requestHeaders: Record<string, string> = {};
     for (const [name, value] of Object.entries(headers)) {
       if (name.toLowerCase() === 'accept') {
-        requestHeaders.accept = value;
+        requestHeaders['accept'] = value;
       }
     }
+    requestHeaders['accept-encoding'] = 'gzip';
     if (sendAuthorization && authorizationHeader) {
-      requestHeaders.authorization = authorizationHeader;
+      requestHeaders['authorization'] = authorizationHeader;
     }
     return new Promise((resolve, reject) => {
       let size = 0;
@@ -316,6 +355,7 @@ export default class WebviewMessageHandler {
               redirectUrl,
               sourceUrl,
               headers,
+              activeRequest,
               authorizationHeader,
               redirects + 1,
               originalOrigin,
@@ -335,8 +375,19 @@ export default class WebviewMessageHandler {
           }
           chunks.push(buffer);
         });
-        response.on('end', () => resolve({ statusCode, statusMessage: response.statusMessage, body: Buffer.concat(chunks).toString('utf8') }));
+        response.on('end', () => {
+          const responseBody = Buffer.concat(chunks);
+          decodeNuGetResponseBody(responseBody, response.headers['content-encoding']).then((decodedBody) => {
+            if (decodedBody.length > 5 * 1024 * 1024) {
+              reject(new Error('NuGet source response exceeded the 5 MB limit after decompression.'));
+              return;
+            }
+            resolve({ statusCode, statusMessage: response.statusMessage, body: decodedBody.toString('utf8') });
+          }, reject);
+        });
       });
+      activeRequest.connections.add(request);
+      request.on('close', () => activeRequest.connections.delete(request));
       request.on('error', reject);
       request.end();
     });
@@ -354,6 +405,7 @@ export default class WebviewMessageHandler {
   }
 
   public dispose(): void {
+    this.cancelActiveNuGetRequests();
     while (this.disposables.length) {
       const disposable = this.disposables.pop();
       if (disposable) {

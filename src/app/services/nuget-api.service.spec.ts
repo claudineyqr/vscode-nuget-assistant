@@ -178,10 +178,10 @@ describe('NuGetApiService', () => {
                     licenseUrl: '',
                     projectUrl: '',
                     tags: '',
-                    dependencyGroups: undefined,
+                    dependencyGroups: [{ targetFramework: 'net10.0', dependencies: [] }],
                     published: '2026-01-01T00:00:00Z',
-                    listed: true,
                     vulnerabilities: undefined,
+                    isPrerelease: false,
                   },
                 },
               ],
@@ -202,6 +202,113 @@ describe('NuGetApiService', () => {
     expect(versionResults[0].versions?.map((version) => version.version)).toEqual(['1.0.0']);
     expect((http.get as jest.Mock).mock.calls.some((call: unknown[]) => call[0] === githubSource.url)).toBe(true);
     expect((http.get as jest.Mock).mock.calls.some((call: unknown[]) => String(call[0]).startsWith('https://api.github.com/'))).toBe(false);
+  });
+
+  it('loads V3 registration pages by their advertised @id when their items are not inlined', async () => {
+    const pageUrl = 'https://packages.example.test/registration/example.package/page/1.0.0/2.0.0.json';
+    const http = createHttpMock((url) => {
+      if (url === source.url) {
+        return of(JSON.stringify({
+          resources: [
+            { '@id': 'https://packages.example.test/registration/', '@type': 'RegistrationsBaseUrl/3.6.0' },
+          ],
+        }));
+      }
+      if (url === 'https://packages.example.test/registration/example.package/index.json') {
+        return of({
+          count: 1,
+          items: [{ '@id': pageUrl, count: 2, lower: '1.0.0', upper: '2.0.0' }],
+        });
+      }
+      if (url === pageUrl) {
+        return of({
+          count: 2,
+          items: [
+            { '@id': `${pageUrl}#1`, catalogEntry: { id: 'Example.Package', version: '1.0.0', listed: true } },
+            { '@id': `${pageUrl}#2`, catalogEntry: { id: 'Example.Package', version: '2.0.0', listed: true } },
+          ],
+        });
+      }
+      return throwError(() => new Error(`Unexpected URL: ${url}`));
+    });
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.searchByPackageIds(['Example.Package'], '', false, source));
+
+    expect(results[0].versions?.map((version) => version.version)).toEqual(['2.0.0', '1.0.0']);
+    expect((http.get as jest.Mock).mock.calls.some(([url]) => url === pageUrl)).toBe(true);
+  });
+
+  it('uses PackageBaseAddress when a V3 source has no registration resource', async () => {
+    const flatContainerUrl = 'https://packages.example.test/flat/';
+    const http = createHttpMock((url) => {
+      if (url === source.url) {
+        return of(JSON.stringify({
+          resources: [{ '@id': flatContainerUrl, '@type': 'PackageBaseAddress/3.0.0' }],
+        }));
+      }
+      if (url === `${flatContainerUrl}example.package/index.json`) {
+        return of({ versions: ['1.0.0', '2.0.0-beta'] });
+      }
+      return throwError(() => new Error(`Unexpected URL: ${url}`));
+    });
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.searchByPackageIds(['Example.Package'], '', false, source));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].versions?.map((version) => version.version)).toEqual(['1.0.0']);
+    expect((http.get as jest.Mock).mock.calls.some(([url]) => String(url).includes('/registration/'))).toBe(false);
+  });
+
+  it('reads registration-shaped metadata returned by a GitHub PackageBaseAddress endpoint', async () => {
+    const githubSource: PackageSource = {
+      name: 'GitHub',
+      url: 'https://nuget.pkg.github.com/claudineyqr/index.json',
+      authorizationHeader: undefined,
+    };
+    const packageIndexUrl = 'https://nuget.pkg.github.com/claudineyqr/github.test/index.json';
+    const http = createHttpMock((url) => {
+      if (url === githubSource.url) {
+        return of(JSON.stringify({
+          resources: [{ '@id': 'https://nuget.pkg.github.com/claudineyqr/', '@type': 'PackageBaseAddress/3.0.0' }],
+        }));
+      }
+      if (url === packageIndexUrl) {
+        return of({
+          count: 1,
+          items: [{
+            '@id': packageIndexUrl,
+            count: 1,
+            items: [{
+              '@id': 'https://nuget.pkg.github.com/claudineyqr/github.test/1.0.0.json',
+              packageContent: 'https://nuget.pkg.github.com/claudineyqr/download/github.test/1.0.0/github.test.1.0.0.nupkg',
+              catalogEntry: {
+                '@id': 'https://nuget.pkg.github.com/claudineyqr/github.test/1.0.0.json',
+                id: 'github.test',
+                version: '1.0.0',
+                description: 'Package Description',
+                authors: 'Github.Test',
+                iconUrl: '',
+                licenseUrl: '',
+                projectUrl: '',
+                tags: '',
+                dependencyGroups: [{ targetFramework: 'net10.0', dependencies: [] }],
+                published: '',
+                isPrerelease: false,
+              },
+            }],
+          }],
+        });
+      }
+      return throwError(() => new Error(`Unexpected URL: ${url}`));
+    });
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.searchByPackageIds(['Github.Test'], '', false, githubSource));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].versions?.map((version) => version.version)).toEqual(['1.0.0']);
   });
 
   it('ignores a failed source when searching all configured sources', async () => {

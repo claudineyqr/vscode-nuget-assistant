@@ -88,6 +88,7 @@ export class ToolBarComponent extends BaseComponent implements OnInit {
     this.subscriptions.add(this.searchForm.valueChanges.pipe(debounceTime(500)).subscribe(() => this.refresh()));
     this.subscriptions.add(
       this.searchForm.get('source')?.valueChanges.subscribe((source: PackageSource) => {
+        this.packageManager.cancelOngoingRequests();
         this.vscodeService.postMessage({ command: 'select-source', sourceUrl: source.url } as SelectSourceMessage);
       })
     );

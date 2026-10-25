@@ -7,7 +7,11 @@ Manage NuGet packages graphically in VS Code. Search, install, update, and remov
 1. In the Explorer, right-click a `.csproj`, `.fsproj`, or `.vbproj` file.
 2. Select **NuGet Assistant: Manage Project Packages**.
 
+![Manage Project Packages](images/manage-project-packages.webp)
+
 To manage packages across a solution, right-click an `.sln` or `.slnx` file and select **NuGet Assistant: Manage Solution Packages**.
+
+![Manage Solution Packages](images/manage-solution-packages.webp)
 
 You can also launch these commands from the Command Palette (`Ctrl+Shift+P`) by searching for **NuGet Assistant**.
 

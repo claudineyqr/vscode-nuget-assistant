@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 
 import { Category } from '../models/category';
 import { PackageRowModel } from '../models/package-row-model';
@@ -59,6 +59,8 @@ export class PackageManagerService {
 
   private _currentSource: PackageSource | undefined;
   private _currentPrerelease = false;
+  private activeSearchSubscription: Subscription | undefined;
+  private activeSelectedPackageSubscription: Subscription | undefined;
 
   constructor(private nugetService: NuGetApiService, private vscodeService: VscodeService) {
     vscodeService.postMessage({
@@ -67,6 +69,7 @@ export class PackageManagerService {
   }
 
   public queryForPackages(query: string, prerelease: boolean, source: PackageSource): void {
+    this.cancelOngoingRequests();
     this._currentSelectedPackage.next(null);
     this._currentSelectedPackageId.next(null);
     this._currentPackages.next(null);
@@ -82,7 +85,7 @@ export class PackageManagerService {
       const search = isAllSources
         ? this.nugetService.searchAll(query, prerelease, sources)
         : this.nugetService.search(query, prerelease, source);
-      search.subscribe({
+      this.activeSearchSubscription = search.subscribe({
         next: (packageRowModels: PackageRowModel[]) => {
           this.setInstalledInformation(packageRowModels);
           this._currentPackages.next(packageRowModels);
@@ -97,7 +100,7 @@ export class PackageManagerService {
         const search = isAllSources
           ? this.nugetService.searchByPackageIdsAll(currentInstalledPackageIds, query, prerelease, sources)
           : this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, source);
-        search.subscribe({
+        this.activeSearchSubscription = search.subscribe({
           next: (packageRowModels: PackageRowModel[]) => {
             this.setInstalledInformation(packageRowModels);
             packageRowModels = this.filterResultsToMatchCategory(packageRowModels);
@@ -125,6 +128,9 @@ export class PackageManagerService {
   }
 
   public changeCurrentProjectSet(projectSet: ProjectSet): void {
+    const availableProjectPaths = new Set(projectSet.projects.map((project) => project.fsPath));
+    const selectedProjectPaths = this._selectedProjectPaths.value.filter((projectPath) => availableProjectPaths.has(projectPath));
+
     this._currentProjects.next(projectSet.projects);
     this._currentProject.next({
       name: projectSet.name,
@@ -138,7 +144,7 @@ export class PackageManagerService {
         return packages;
       }, [] as InstalledPackage[]),
     });
-    this._selectedProjectPaths.next(projectSet.projects.map((project) => project.fsPath));
+    this._selectedProjectPaths.next(selectedProjectPaths);
 
     const currentPackages = this._currentPackages.value;
     if (currentPackages) {
@@ -152,9 +158,7 @@ export class PackageManagerService {
       return;
     }
 
-    const projectPaths = packageToChange.isInstalled
-      ? packageToChange.installedProjectPaths ?? []
-      : this._currentProjects.value.map((project) => project.fsPath);
+    const projectPaths = packageToChange.isInstalled ? packageToChange.installedProjectPaths ?? [] : [];
     this._selectedProjectPaths.next(projectPaths);
   }
 
@@ -172,6 +176,8 @@ export class PackageManagerService {
   }
 
   public changeCurrentSelectedPackage(selectedPackage: PackageRowModel | null): void {
+    this.activeSelectedPackageSubscription?.unsubscribe();
+    this.activeSelectedPackageSubscription = undefined;
     this._currentSelectedPackageId.next(selectedPackage?.id ?? null);
     this._currentSelectedPackage.next(null);
 
@@ -185,7 +191,7 @@ export class PackageManagerService {
       if (!source) {
         return;
       }
-      this.nugetService.searchByPackageIds([selectedPackage.id], '', this._currentPrerelease, source).subscribe({
+      this.activeSelectedPackageSubscription = this.nugetService.searchByPackageIds([selectedPackage.id], '', this._currentPrerelease, source).subscribe({
         next: (results) => {
           if (this._currentSelectedPackageId.value !== selectedPackage.id) {
             return;
@@ -203,6 +209,13 @@ export class PackageManagerService {
     }
   }
 
+  public cancelOngoingRequests(): void {
+    this.activeSearchSubscription?.unsubscribe();
+    this.activeSearchSubscription = undefined;
+    this.activeSelectedPackageSubscription?.unsubscribe();
+    this.activeSelectedPackageSubscription = undefined;
+  }
+
   public changeCurrentCategory(category: Category): void {
     this._currentCategory.next(category);
   }
@@ -216,7 +229,6 @@ export class PackageManagerService {
       return;
     }
 
-    this.prepareProjectSelection(packageToInstall);
     const installMessage = this.mapPackageToInstallMessage(packageToInstall, version);
 
     this.vscodeService.postMessage(installMessage);

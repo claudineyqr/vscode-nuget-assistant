@@ -128,6 +128,9 @@ export class PackageManagerService {
   }
 
   public changeCurrentProjectSet(projectSet: ProjectSet): void {
+    const availableProjectPaths = new Set(projectSet.projects.map((project) => project.fsPath));
+    const selectedProjectPaths = this._selectedProjectPaths.value.filter((projectPath) => availableProjectPaths.has(projectPath));
+
     this._currentProjects.next(projectSet.projects);
     this._currentProject.next({
       name: projectSet.name,
@@ -141,7 +144,7 @@ export class PackageManagerService {
         return packages;
       }, [] as InstalledPackage[]),
     });
-    this._selectedProjectPaths.next(projectSet.projects.map((project) => project.fsPath));
+    this._selectedProjectPaths.next(selectedProjectPaths);
 
     const currentPackages = this._currentPackages.value;
     if (currentPackages) {
@@ -155,9 +158,7 @@ export class PackageManagerService {
       return;
     }
 
-    const projectPaths = packageToChange.isInstalled
-      ? packageToChange.installedProjectPaths ?? []
-      : this._currentProjects.value.map((project) => project.fsPath);
+    const projectPaths = packageToChange.isInstalled ? packageToChange.installedProjectPaths ?? [] : [];
     this._selectedProjectPaths.next(projectPaths);
   }
 
@@ -228,7 +229,6 @@ export class PackageManagerService {
       return;
     }
 
-    this.prepareProjectSelection(packageToInstall);
     const installMessage = this.mapPackageToInstallMessage(packageToInstall, version);
 
     this.vscodeService.postMessage(installMessage);

@@ -1,12 +1,12 @@
 export interface PackageMetaResponse {
   count: number;
-  items: RegistrationPage[];
+  items?: RegistrationPage[];
 }
 
 export interface RegistrationPage {
   '@id': string;
   count: number;
-  items: RegistrationLeaf[] | undefined;
+  items?: RegistrationLeaf[];
 }
 
 export interface RegistrationLeaf {
@@ -26,7 +26,7 @@ export interface CatalogEntry {
   tags: string | string[];
   dependencyGroups: PackageDependencyGroup[] | undefined;
   published: string;
-  listed: boolean;
+  listed?: boolean;
   vulnerabilities: Vulnerability[] | undefined;
 }
 

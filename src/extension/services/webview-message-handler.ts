@@ -6,6 +6,7 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import * as dns from 'node:dns';
 import * as path from 'node:path';
+import { decodeNuGetResponseBody } from './nuget-response';
 
 import NuGetConfigLoader from './nuget-config-loader';
 import ProjectFileLoader from './project-file-loader';
@@ -328,6 +329,7 @@ export default class WebviewMessageHandler {
         requestHeaders['accept'] = value;
       }
     }
+    requestHeaders['accept-encoding'] = 'gzip';
     if (sendAuthorization && authorizationHeader) {
       requestHeaders['authorization'] = authorizationHeader;
     }
@@ -373,7 +375,16 @@ export default class WebviewMessageHandler {
           }
           chunks.push(buffer);
         });
-        response.on('end', () => resolve({ statusCode, statusMessage: response.statusMessage, body: Buffer.concat(chunks).toString('utf8') }));
+        response.on('end', () => {
+          const responseBody = Buffer.concat(chunks);
+          decodeNuGetResponseBody(responseBody, response.headers['content-encoding']).then((decodedBody) => {
+            if (decodedBody.length > 5 * 1024 * 1024) {
+              reject(new Error('NuGet source response exceeded the 5 MB limit after decompression.'));
+              return;
+            }
+            resolve({ statusCode, statusMessage: response.statusMessage, body: decodedBody.toString('utf8') });
+          }, reject);
+        });
       });
       activeRequest.connections.add(request);
       request.on('close', () => activeRequest.connections.delete(request));

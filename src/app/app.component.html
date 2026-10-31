@@ -2,6 +2,13 @@
   <section class="header">
     <app-nav-bar></app-nav-bar>
     <app-tool-bar></app-tool-bar>
+    <div *ngIf="packageManager.currentPackageOperation | async as operation" class="package-operation" role="status" aria-live="polite">
+      <span class="operation-spinner" aria-hidden="true"></span>
+      <span>
+        {{ operation.action === 'remove' ? 'Uninstalling' : operation.action === 'update' ? 'Updating' : 'Installing' }}
+        {{ operation.packageId }}...
+      </span>
+    </div>
   </section>
   <section class="main-section">
     <as-split direction="horizontal" [gutterSize]="5">

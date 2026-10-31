@@ -5,6 +5,7 @@ import { Category } from '../models/category';
 import { PackageRowModel } from '../models/package-row-model';
 import { PackageSource } from '../../shared/models/package-source';
 import { InstalledPackage, Project, ProjectSet } from '../../shared/models/project';
+import { PackageOperationStatus } from '../../shared/models/extension-message';
 import { InstallMessage, UninstallMessage } from '../../shared/models/ui-message';
 import { NuGetApiService } from './nuget-api.service';
 import { VscodeService } from './vscode.service';
@@ -55,9 +56,15 @@ export class PackageManagerService {
     return this._currentSelectedPackageId.asObservable();
   }
 
+  private _currentPackageOperation = new BehaviorSubject<PackageOperationStatus | null>(null);
+  public get currentPackageOperation(): Observable<PackageOperationStatus | null> {
+    return this._currentPackageOperation.asObservable();
+  }
+
   private showOnlyVulnerable = false;
 
   private _currentSource: PackageSource | undefined;
+  private _currentQuery = '';
   private _currentPrerelease = false;
   private activeSearchSubscription: Subscription | undefined;
   private activeSelectedPackageSubscription: Subscription | undefined;
@@ -75,6 +82,7 @@ export class PackageManagerService {
     this._currentPackages.next(null);
 
     this._currentSource = source;
+    this._currentQuery = query;
     this._currentPrerelease = prerelease;
 
     const currentCategory = this._currentCategory.value;
@@ -113,6 +121,12 @@ export class PackageManagerService {
       } else {
         this._currentPackages.next([]);
       }
+    }
+  }
+
+  public refreshCurrentPackages(): void {
+    if (this._currentSource) {
+      this.queryForPackages(this._currentQuery, this._currentPrerelease, this._currentSource);
     }
   }
 
@@ -224,12 +238,12 @@ export class PackageManagerService {
     this.showOnlyVulnerable = showOnlyVulnerable;
   }
 
-  public installPackage(packageToInstall: PackageRowModel | null, version?: string) {
+  public installPackage(packageToInstall: PackageRowModel | null, version?: string, operation?: 'install' | 'update') {
     if (packageToInstall === null) {
       return;
     }
 
-    const installMessage = this.mapPackageToInstallMessage(packageToInstall, version);
+    const installMessage = this.mapPackageToInstallMessage(packageToInstall, version, undefined, operation);
 
     this.vscodeService.postMessage(installMessage);
   }
@@ -239,7 +253,14 @@ export class PackageManagerService {
       return;
     }
 
-    const installMessages = packagesToInstall.map((p) => this.mapPackageToInstallMessage(p));
+    const installMessages = packagesToInstall.map((packageToInstall) =>
+      this.mapPackageToInstallMessage(
+        packageToInstall,
+        undefined,
+        packageToInstall.installedProjectPaths ?? [],
+        packageToInstall.isOutdated ? 'update' : 'install'
+      )
+    );
 
     this.vscodeService.postMessages(installMessages);
   }
@@ -259,7 +280,16 @@ export class PackageManagerService {
     } as UninstallMessage);
   }
 
-  private mapPackageToInstallMessage(packageToInstall: PackageRowModel, version?: string): InstallMessage {
+  public changeCurrentPackageOperation(operation: PackageOperationStatus | null): void {
+    this._currentPackageOperation.next(operation);
+  }
+
+  private mapPackageToInstallMessage(
+    packageToInstall: PackageRowModel,
+    version?: string,
+    projectPaths?: string[],
+    operation?: 'install' | 'update'
+  ): InstallMessage {
     const currentProject = this._currentProject.value;
     if (!currentProject) {
       throw new Error('Current project cannot be undefined');
@@ -273,7 +303,8 @@ export class PackageManagerService {
       packageId: packageToInstall.id,
       packageVersion: versionToInstall,
       packageSourceUrl: packageToInstall.sourceUrl,
-      projectPaths: this.getProjectPathsForMessage(this._selectedProjectPaths.value),
+      projectPaths: projectPaths ?? this.getProjectPathsForMessage(this._selectedProjectPaths.value),
+      operation: operation ?? (packageToInstall.isOutdated ? 'update' : 'install'),
     };
   }
 

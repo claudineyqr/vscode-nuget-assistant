@@ -51,7 +51,10 @@ export default class WebviewMessageHandler {
     this.projectFileLoader = new ProjectFileLoader();
     this.solutionLoader = new SolutionLoader(this.projectFileLoader);
     this.nuGetConfigLoader = new NuGetConfigLoader(process.env, undefined, (message) => this.log(message));
-    this.taskManager = new TaskManager(() => this.loadProject());
+    this.taskManager = new TaskManager(
+      (operation) => this.webview.postMessage({ type: 'package-operation-progress', operation }),
+      () => this.reloadProjectAfterPackageOperations()
+    );
 
     this.webview.onDidReceiveMessage(
       (message: unknown) => {
@@ -129,7 +132,10 @@ export default class WebviewMessageHandler {
         '--interactive',
       ];
 
-      this.taskManager.executeTask(this.createTask('add', args));
+      this.taskManager.executeTask(this.createTask('add', args), {
+        action: message.operation ?? 'install',
+        packageId: message.packageId,
+      });
     });
   }
 
@@ -148,7 +154,10 @@ export default class WebviewMessageHandler {
         'package',
         { value: message.packageId, quoting: vscode.ShellQuoting.Strong },
       ];
-      this.taskManager.executeTask(this.createTask('remove', args));
+      this.taskManager.executeTask(this.createTask('remove', args), {
+        action: 'remove',
+        packageId: message.packageId,
+      });
     });
   }
 
@@ -178,14 +187,27 @@ export default class WebviewMessageHandler {
     );
   }
 
-  private loadProject(): void {
+  private loadProject(): Promise<void> {
     const projectFileExtension = this.projectFilePath.toLowerCase().slice(this.projectFilePath.lastIndexOf('.'));
     const isSolution = projectFileExtension === '.sln' || projectFileExtension === '.slnx';
     const projectLoad = isSolution
       ? this.solutionLoader.loadAsync(this.projectFilePath).then((projectSet) => ({ type: 'project-set', data: projectSet } as ExtensionMessage))
       : this.projectFileLoader.loadProjectAsync(this.projectFilePath).then((project) => ({ type: 'project', data: project } as ExtensionMessage));
 
-    projectLoad.then((message) => this.webview.postMessage(message));
+    return projectLoad.then((message) => {
+      this.webview.postMessage(message);
+    });
+  }
+
+  private reloadProjectAfterPackageOperations(): void {
+    void this.loadProject()
+      .then(() => this.webview.postMessage({ type: 'packages-changed' }))
+      .catch((error) => {
+        const details = this.getErrorMessage(error);
+        this.log(`Error reloading project after package operations: ${details}`);
+        vscode.window.showErrorMessage(`Error reloading project after package operations: ${details}`);
+      })
+      .finally(() => this.webview.postMessage({ type: 'package-operation-complete' }));
   }
 
   private loadConfiguration(): void {

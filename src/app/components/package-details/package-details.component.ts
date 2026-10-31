@@ -34,7 +34,7 @@ export class PackageDetailsComponent extends BaseComponent implements OnInit {
   }
 
   public install(): void {
-    this.packageManager.installPackage(this.package, this.selectedVersionObject.version);
+    this.packageManager.installPackage(this.package, this.selectedVersionObject.version, this.package?.isInstalled ? 'update' : 'install');
   }
 
   public uninstall(): void {

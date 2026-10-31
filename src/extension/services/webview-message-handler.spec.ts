@@ -47,3 +47,54 @@ describe('WebviewMessageHandler NuGet request cancellation', () => {
     expect(state.size).toBe(0);
   });
 });
+
+describe('WebviewMessageHandler package operation refresh', () => {
+  it('reports package changes after the project reload finishes', async () => {
+    const messageOrder: string[] = [];
+    const webview = {
+      postMessage: jest.fn((message: { type: string }) => {
+        messageOrder.push(message.type);
+        return Promise.resolve(true);
+      }),
+    };
+    const handler = Object.create(WebviewMessageHandler.prototype) as {
+      reloadProjectAfterPackageOperations(): void;
+      loadProject: jest.Mock;
+      webview: typeof webview;
+    };
+    handler.webview = webview;
+    handler.loadProject = jest.fn(() =>
+      Promise.resolve().then(() => {
+        webview.postMessage({ type: 'project' });
+      })
+    );
+
+    handler.reloadProjectAfterPackageOperations();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(messageOrder).toEqual(['project', 'packages-changed', 'package-operation-complete']);
+  });
+
+  it('clears the operation indicator when reloading the project fails', async () => {
+    const webview = { postMessage: jest.fn(() => Promise.resolve(true)) };
+    const handler = Object.create(WebviewMessageHandler.prototype) as {
+      reloadProjectAfterPackageOperations(): void;
+      loadProject: jest.Mock;
+      webview: typeof webview;
+      getErrorMessage: jest.Mock;
+      log: jest.Mock;
+    };
+    handler.webview = webview;
+    handler.loadProject = jest.fn().mockRejectedValue(new Error('reload failed'));
+    handler.getErrorMessage = jest.fn(() => 'reload failed');
+    handler.log = jest.fn();
+
+    handler.reloadProjectAfterPackageOperations();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handler.log).toHaveBeenCalledWith(expect.stringContaining('reload failed'));
+    expect(webview.postMessage).toHaveBeenCalledWith({ type: 'package-operation-complete' });
+    expect(webview.postMessage).not.toHaveBeenCalledWith({ type: 'packages-changed' });
+  });
+});

@@ -29,4 +29,5 @@ export interface UninstallMessage extends UIMessage {
 export interface InstallMessage extends UninstallMessage {
   packageVersion: string;
   packageSourceUrl: string;
+  operation: 'install' | 'update';
 }

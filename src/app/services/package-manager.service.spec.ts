@@ -14,7 +14,7 @@ describe('PackageManagerService', () => {
 
   let nugetApiServiceMock: { search: jest.Mock; searchAll: jest.Mock; searchByPackageIds: jest.Mock; searchByPackageIdsAll: jest.Mock };
 
-  let vscodeServiceMock: { postMessage: jest.Mock };
+  let vscodeServiceMock: { postMessage: jest.Mock; postMessages: jest.Mock };
 
   beforeEach(() => {
     nugetApiServiceMock = {
@@ -25,6 +25,7 @@ describe('PackageManagerService', () => {
     };
     vscodeServiceMock = {
       postMessage: jest.fn(),
+      postMessages: jest.fn(),
     };
   });
 
@@ -272,6 +273,45 @@ describe('PackageManagerService', () => {
     expect(nugetApiServiceMock.search).not.toHaveBeenCalled();
   });
 
+  test('refreshCurrentPackages should repeat the active Updates query and remove packages that are no longer outdated', () => {
+    const source = getMockPackageSource();
+    const sources = [source];
+    const latestPackage = getMockApiPackages()[0];
+    latestPackage.version = '1.0.0';
+    nugetApiServiceMock.searchByPackageIdsAll.mockReturnValue(of([latestPackage]));
+    service.changeCurrentSources(sources);
+    service.changeCurrentProject({
+      ...getMockCurrentProject(),
+      packages: [{ id: 'Package1', version: '0.9.0' }],
+    });
+    service.changeCurrentCategory(Category.Updates);
+
+    service.queryForPackages('Package1', true, ALL_PACKAGE_SOURCES);
+    service.changeCurrentProject({
+      ...getMockCurrentProject(),
+      packages: [{ id: 'Package1', version: '1.0.0' }],
+    });
+    service.refreshCurrentPackages();
+
+    let currentPackages: PackageRowModel[] | null = null;
+    service.currentPackages.subscribe((packages) => {
+      currentPackages = packages;
+    });
+
+    expect(nugetApiServiceMock.searchByPackageIdsAll).toHaveBeenCalledTimes(2);
+    expect(nugetApiServiceMock.searchByPackageIdsAll).toHaveBeenLastCalledWith(['Package1'], 'Package1', true, sources);
+    expect(currentPackages).toEqual([]);
+  });
+
+  test('refreshCurrentPackages does nothing before a search source is selected', () => {
+    service.refreshCurrentPackages();
+
+    expect(nugetApiServiceMock.search).not.toHaveBeenCalled();
+    expect(nugetApiServiceMock.searchAll).not.toHaveBeenCalled();
+    expect(nugetApiServiceMock.searchByPackageIds).not.toHaveBeenCalled();
+    expect(nugetApiServiceMock.searchByPackageIdsAll).not.toHaveBeenCalled();
+  });
+
   test('queryForPackages should stop loading when Updates search fails', () => {
     const source = getMockPackageSource();
     const currentProject = getMockCurrentProject();
@@ -438,6 +478,7 @@ describe('PackageManagerService', () => {
       packageId: packageToInstall.id,
       packageVersion: expectedVersion,
       packageSourceUrl: packageToInstall.sourceUrl,
+      operation: 'install',
     });
   });
 
@@ -458,6 +499,77 @@ describe('PackageManagerService', () => {
       projectName: currentProject.fsPath,
       packageId: packageToUninstall.id,
     });
+  });
+
+  test('installPackage marks updates separately from installs', () => {
+    const packageToUpdate = getMockApiPackages()[0];
+    service.changeCurrentProject(getMockCurrentProject());
+
+    service.installPackage(packageToUpdate, undefined, 'update');
+
+    expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'add-package',
+      packageId: packageToUpdate.id,
+      operation: 'update',
+    }));
+  });
+
+  test('installPackages should target only projects where each package is installed', () => {
+    const firstProjectPath = '/solution/First.csproj';
+    const secondProjectPath = '/solution/Second.csproj';
+    const thirdProjectPath = '/solution/Third.csproj';
+    const firstProject: Project = {
+      name: 'First.csproj',
+      fsPath: firstProjectPath,
+      packages: [{ id: 'Package1', version: '0.9.0' }],
+    };
+    const secondProject: Project = {
+      name: 'Second.csproj',
+      fsPath: secondProjectPath,
+      packages: [{ id: 'Package2', version: '1.9.0' }],
+    };
+    const thirdProject: Project = {
+      name: 'Third.csproj',
+      fsPath: thirdProjectPath,
+      packages: [{ id: 'Package1', version: '0.8.0' }],
+    };
+    service.changeCurrentProjectSet({
+      name: 'Sample.sln',
+      fsPath: '/solution/Sample.sln',
+      projects: [firstProject, secondProject, thirdProject],
+    });
+    service.setSelectedProjectPaths([firstProjectPath, secondProjectPath, thirdProjectPath]);
+
+    const package1 = { ...getMockApiPackages()[0], isOutdated: true, installedProjectPaths: [firstProjectPath, thirdProjectPath] };
+    const package2 = { ...getMockApiPackages()[1], isOutdated: true, installedProjectPaths: [secondProjectPath] };
+    service.installPackages([package1, package2]);
+
+    expect(vscodeServiceMock.postMessages).toHaveBeenCalledWith([
+      {
+        command: 'add-package',
+        projectName: '/solution/Sample.sln',
+        packageId: 'Package1',
+        packageVersion: package1.version,
+        packageSourceUrl: package1.sourceUrl,
+        projectPaths: [firstProjectPath, thirdProjectPath],
+        operation: 'update',
+      },
+      {
+        command: 'add-package',
+        projectName: '/solution/Sample.sln',
+        packageId: 'Package2',
+        packageVersion: package2.version,
+        packageSourceUrl: package2.sourceUrl,
+        projectPaths: [secondProjectPath],
+        operation: 'update',
+      },
+    ]);
+  });
+
+  test('installPackages should not send messages for an empty selection', () => {
+    service.installPackages([]);
+
+    expect(vscodeServiceMock.postMessages).not.toHaveBeenCalled();
   });
 
   function getMockApiPackages(): PackageRowModel[] {

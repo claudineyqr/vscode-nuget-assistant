@@ -39,7 +39,7 @@ export class PackageRowComponent {
 
   public install(event: MouseEvent): void {
     event.stopPropagation();
-    this.packageManager.installPackage(this.package);
+    this.packageManager.installPackage(this.package, undefined, 'install');
   }
 
   public uninstall(event: MouseEvent): void {
@@ -49,6 +49,6 @@ export class PackageRowComponent {
 
   public update(event: MouseEvent): void {
     event.stopPropagation();
-    this.packageManager.installPackage(this.package);
+    this.packageManager.installPackage(this.package, undefined, 'update');
   }
 }

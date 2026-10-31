@@ -6,8 +6,14 @@ export const workspace = {
 export const window = {
   showInformationMessage: jest.fn(),
   showWarningMessage: jest.fn(),
+  showErrorMessage: jest.fn(),
   showOpenDialog: jest.fn(),
   showQuickPick: jest.fn(),
+};
+
+export const tasks = {
+  executeTask: jest.fn(),
+  onDidEndTask: jest.fn(),
 };
 
 export const Uri = {
@@ -21,5 +27,6 @@ export const Uri = {
 export default {
   workspace,
   window,
+  tasks,
   Uri,
 };

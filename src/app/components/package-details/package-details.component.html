@@ -1,0 +1,119 @@
+@if (isLoading) {
+<app-loading-spinner></app-loading-spinner>
+}
+@if (package) {
+<div class="package-details h-full overflow-y-auto px-4 py-3">
+  <div class="header mb-4 flex items-center gap-3">
+    <div
+      class="icon flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-vscode-secondary/60">
+      @if (package.iconUrl) {
+      <img class="size-full object-contain" [src]="package.iconUrl" alt="{{ package.id }} icon"
+        i18n-alt="@@package.icon.alt" />
+      }
+      @if (!package.iconUrl) {
+      <fa-icon class="placeholder-icon text-3xl text-vscode-muted" icon="cubes"></fa-icon>
+      }
+    </div>
+    <div class="name break-all text-lg font-semibold tracking-tight text-vscode-foreground">{{ package.id }}</div>
+  </div>
+  <app-project-selection [packageToChange]="package"></app-project-selection>
+  <div class="version-selection my-4 space-y-2 rounded-lg border border-vscode-border bg-vscode-secondary/20 p-3">
+    @if (package.isInstalled) {
+    <div class="version-container flex items-center gap-2">
+      <span class="label w-14 shrink-0 text-xs font-medium text-vscode-muted"
+        i18n="@@packageDetails.installed.label">Installed:</span>
+      <span
+        class="drop-down installed-version-display min-w-0 flex-1 truncate rounded-md border border-vscode-input-border bg-vscode-input px-2 py-1.5 text-sm text-vscode-input-foreground">{{
+        package.installedVersion }}</span>
+      <button
+        class="button inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary px-3 text-xs font-medium text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        (click)="uninstall()" i18n="@@packageDetails.uninstall.button">Uninstall</button>
+    </div>
+    }
+    <div class="version-container flex items-center gap-2">
+      <label class="label w-14 shrink-0 text-xs font-medium text-vscode-muted" for="package-version"
+        i18n="@@packageDetails.version.label">Version:</label>
+      <select id="package-version"
+        class="drop-down h-8 min-w-0 flex-1 rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        [formControl]="selectedVersion">
+        @for (version of package.versions; track version) {
+        <option [ngValue]="version" i18n="@@packageDetails.version.vulnerableSuffix">{{ version.version }}@if
+          (version.vulnerabilities?.length) { (Vulnerable) }</option>
+        }
+      </select>
+      <button
+        class="button inline-flex h-8 min-w-20 items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-semibold text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        [disabled]="isSelectedVersionInstalled" (click)="install()">{{ package.isInstalled ? updateLabel : installLabel
+        }}</button>
+    </div>
+  </div>
+  @if (selectedVersionObject) {
+  <app-package-details-vulnerabilities
+    [vulnerabilities]="selectedVersionObject.vulnerabilities"></app-package-details-vulnerabilities>
+  <app-package-details-deprecation [deprecation]="selectedVersionObject.deprecation" [packageId]="package.id"
+    [version]="selectedVersionObject.version"></app-package-details-deprecation>
+  <div class="description mt-4">
+    <p class="label mb-1.5 text-xs font-semibold uppercase tracking-wide text-vscode-muted"
+      i18n="@@packageDetails.description.heading">Description</p>
+    <pre
+      class="description-text whitespace-pre-wrap break-words font-[family-name:var(--vscode-font-family)] text-sm leading-6 text-vscode-foreground">{{ selectedVersionObject.description }}</pre>
+  </div>
+  <div class="details mt-5 space-y-2 border-t border-vscode-border pt-4 text-sm">
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted"
+        i18n="@@packageDetails.metadata.version">Version:</span>
+      <span class="content tabular-nums">{{ selectedVersionObject.version }}</span>
+    </div>
+    @if (selectedVersionObject.authors) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted"
+        i18n="@@packageDetails.metadata.authors">Author(s):</span>
+      <span class="content">{{ selectedVersionObject.authors }}</span>
+    </div>
+    }
+    @if (selectedVersionObject.licenseUrl) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.license.label">License:</span>
+      <span class="content min-w-0 break-all"><a
+          class="text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+          [href]="selectedVersionObject.licenseUrl">{{ selectedVersionObject.licenseUrl }}</a></span>
+    </div>
+    }
+    @if (selectedVersionObject.published) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.published.label">Date
+        published:</span>
+      <span class="content">{{ selectedVersionObject.published | date:'fullDate' }}
+        ({{ formatNumericDate(selectedVersionObject.published) }})</span>
+    </div>
+    }
+    @if (selectedVersionObject.projectUrl) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.projectUrl.label">Project
+        URL:</span>
+      <span class="content min-w-0 break-all"><a
+          class="text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+          [href]="selectedVersionObject.projectUrl">{{ selectedVersionObject.projectUrl }}</a></span>
+    </div>
+    }
+    @if (reportAbuseUrl; as abuseUrl) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.reportAbuse.label">Report
+        abuse:</span>
+      <span class="content min-w-0 break-all"><a
+          class="text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+          [href]="abuseUrl" target="_blank" rel="noopener noreferrer">{{ abuseUrl }}</a></span>
+    </div>
+    }
+    @if (selectedVersionObject.tags) {
+    <div class="details-row flex flex-wrap gap-x-2">
+      <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.tags.label">Tags:</span>
+      <span class="content">{{ selectedVersionObject.tags }}</span>
+    </div>
+    }
+    <app-package-details-dependencies
+      [dependencyGroups]="selectedVersionObject.dependencyGroups"></app-package-details-dependencies>
+  </div>
+  }
+</div>
+}

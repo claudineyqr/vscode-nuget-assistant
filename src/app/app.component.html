@@ -1,0 +1,29 @@
+<div class="layout flex h-full min-h-0 flex-col bg-vscode-editor text-vscode-foreground">
+  <section class="header flex min-w-[525px] shrink-0 flex-col border-b border-vscode-border">
+    <app-nav-bar></app-nav-bar>
+    <app-tool-bar></app-tool-bar>
+    @if (packageManager.currentPackageOperation | async; as operation) {
+    <output
+      class="package-operation flex w-full items-center gap-2 border-l-4 border-vscode-accent bg-vscode-secondary px-3 py-2.5 text-sm font-medium text-vscode-foreground shadow-sm"
+      aria-live="polite" aria-atomic="true">
+      <span
+        class="operation-spinner inline-block size-4 shrink-0 animate-[operation-spinner-rotate_0.8s_linear_infinite] rounded-full border-2 border-vscode-border border-t-vscode-accent motion-reduce:animate-none"
+        aria-hidden="true"></span>
+      <span class="min-w-0 break-words" i18n="@@operation.status">
+        {{ getOperationLabel(operation.action) }}
+        {{ operation.packageId }}...
+      </span>
+    </output>
+    }
+  </section>
+  <section class="main-section flex min-h-0 flex-1">
+    <as-split direction="horizontal" [gutterSize]="5">
+      <as-split-area [size]="60" [minSize]="20">
+        <app-package-list></app-package-list>
+      </as-split-area>
+      <as-split-area [size]="40" [minSize]="20">
+        <app-package-details></app-package-details>
+      </as-split-area>
+    </as-split>
+  </section>
+</div>

@@ -1,0 +1,22 @@
+@if (dependencyGroups) {
+<div class="dependencies-container mt-4 border-t border-vscode-border pt-3">
+  <div class="label text-xs font-semibold uppercase tracking-wide text-vscode-muted"
+    i18n="@@packageDetails.dependencies.heading">Dependencies</div>
+  @for (dependencyGroup of dependencyGroups; track dependencyGroup) {
+  <div class="group mt-2">
+    <div class="group-name ml-3 text-xs font-medium text-vscode-foreground">{{ dependencyGroup.targetFramework }}</div>
+    @if (dependencyGroup.dependencies?.length) {
+    @for (dependency of dependencyGroup.dependencies; track dependency) {
+    <div class="dependency ml-6 flex flex-wrap gap-x-2 text-xs">
+      <span class="id font-medium">{{ dependency.id }}</span>
+      <span class="range text-vscode-muted">{{ dependency.range | versionRange }}</span>
+    </div>
+    }
+    } @else {
+    <div class="dependency ml-6 text-xs italic text-vscode-muted" i18n="@@packageDetails.dependencies.empty">No
+      dependencies</div>
+    }
+  </div>
+  }
+</div>
+}

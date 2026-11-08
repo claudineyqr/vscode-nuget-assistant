@@ -1,0 +1,104 @@
+@if (package) {
+<div
+  class="package-row group flex min-h-[76px] items-stretch gap-2 rounded-lg border border-transparent px-2.5 py-2 transition-colors motion-reduce:transition-none"
+  [ngClass]="isActive ? 'border-vscode-accent/30 bg-vscode-selection text-vscode-selection-foreground shadow-sm' : 'hover:border-vscode-border hover:bg-vscode-hover hover:text-vscode-hover-foreground'">
+  @if (showSelectionCheckbox) {
+  <label class="sr-only" [attr.for]="'select-package-' + package.id" i18n="@@packageRow.selectCheckbox.label">Select {{
+    package.id }}</label>
+  }
+  @if (showSelectionCheckbox) {
+  <input [id]="'select-package-' + package.id" class="select-checkbox vscode-checkbox my-auto" type="checkbox"
+    [checked]="isSelected" (change)="select($event)" />
+  }
+  <button type="button"
+    class="package-row-select flex min-w-0 flex-1 cursor-pointer items-start rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+    aria-label="Select package {{ package.id }}" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
+    (click)="click()">
+    <div class="icon relative ml-0.5 mr-3 size-10 shrink-0 overflow-hidden rounded-md bg-vscode-secondary/60">
+      @if (package.iconUrl) {
+      <img class="size-full object-contain" [src]="package.iconUrl" alt="{{ package.id }} icon"
+        i18n-alt="@@package.icon.alt" (error)="package.iconUrl = ''" />
+      }
+      @if (!package.iconUrl) {
+      <fa-icon class="placeholder-icon flex size-full items-center justify-center text-2xl text-vscode-muted"
+        icon="cubes"></fa-icon>
+      }
+      @if (package.isInstalled) {
+      <fa-stack class="status-icon absolute -bottom-1 -right-1 rounded-full bg-vscode-editor p-0.5 text-sm" size="1x">
+        <fa-icon icon="circle" stackItemSize="1x"></fa-icon>
+        <fa-icon class="actual-icon" [ngClass]="package.isOutdated ? 'text-vscode-info' : 'text-vscode-success'"
+          [icon]="package.isOutdated ? 'circle-up' : 'circle-check'" stackItemSize="1x"></fa-icon>
+      </fa-stack>
+      }
+    </div>
+    <div class="description-container min-w-0 flex-1 overflow-hidden">
+      <div class="package-details truncate">
+        <span class="name text-sm font-semibold tracking-tight">{{ package.id }}</span>
+        @if (package.verified) {
+        <span class="verified-icon ml-1.5 text-xs"
+          [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-accent'"
+          title="The ID prefix of this package has been reserved for the owner of the package by the currently selected feed."
+          i18n-title="@@package.verified.tooltip"><fa-icon icon="circle-check"></fa-icon></span>
+        }
+        @if (package.authors) {
+        <span class="author ml-2 text-xs"
+          [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-muted'"
+          i18n="@@packageRow.authors.prefix">by {{ package.authors
+          }}</span>
+        }
+      </div>
+      <div class="mt-1 line-clamp-2 text-xs leading-4"
+        [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-muted'">{{ package.description.length >
+        180 ? (package.description | slice: 0:177) + '...' : package.description }}</div>
+    </div>
+    <div class="versions ml-2 flex shrink-0 flex-col items-end justify-between whitespace-nowrap text-xs tabular-nums">
+      @if (package.isOutdated) {
+      <span class="flex items-center gap-1 text-[13px]"
+        [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-muted'">
+        @if (installedWarningTitle; as title) {
+        <fa-icon class="text-vscode-warning" icon="triangle-exclamation" [title]="title"
+          [attr.aria-label]="title"></fa-icon>
+        }
+        {{ package.installedVersion }}
+      </span>
+      }
+      <span class="flex items-center gap-1">
+        @if (warningTitle; as title) {
+        <fa-icon class="text-vscode-warning" icon="triangle-exclamation" [title]="title"
+          [attr.aria-label]="title"></fa-icon>
+        }
+        <span class="rounded px-1.5 py-0.5 font-medium"
+          [ngClass]="isActive ? 'border border-vscode-selection-foreground/20 bg-vscode-selection-foreground/15 text-vscode-selection-foreground' : 'bg-vscode-secondary text-vscode-secondary-foreground'">{{
+          package.version }}</span>
+      </span>
+    </div>
+  </button>
+  <div
+    class="actions flex shrink-0 flex-col items-end justify-between gap-1 opacity-100 transition-opacity motion-reduce:transition-none md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+    @if (!package.isInstalled) {
+    <button
+      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="install($event)" title="Install {{ package.id }}" i18n-title="@@packageRow.installButton.label"
+      aria-label="Install {{ package.id }}" i18n-aria-label="@@packageRow.installButton.label">
+      <fa-icon icon="arrow-down"></fa-icon>
+    </button>
+    }
+    @if (package.isInstalled) {
+    <button
+      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="uninstall($event)" title="Uninstall {{ package.id }}" i18n-title="@@packageRow.uninstallButton.label"
+      aria-label="Uninstall {{ package.id }}" i18n-aria-label="@@packageRow.uninstallButton.label">
+      <fa-icon icon="xmark"></fa-icon>
+    </button>
+    }
+    @if (package.isOutdated) {
+    <button
+      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="update($event)" title="Update {{ package.id }}" i18n-title="@@packageRow.updateButton.label"
+      aria-label="Update {{ package.id }}" i18n-aria-label="@@packageRow.updateButton.label">
+      <fa-icon icon="arrow-up"></fa-icon>
+    </button>
+    }
+  </div>
+</div>
+}

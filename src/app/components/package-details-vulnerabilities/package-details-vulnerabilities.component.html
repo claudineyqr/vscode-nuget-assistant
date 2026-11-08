@@ -1,0 +1,20 @@
+@if (vulnerabilities) {
+<div class="vulnerabilities-container my-4 rounded-lg border border-vscode-warning/40 bg-vscode-warning/10 p-3">
+  <div class="header flex items-center gap-2 text-vscode-warning">
+    <fa-icon class="warning-icon" icon="triangle-exclamation"></fa-icon>
+    <span class="label text-xs font-semibold" i18n="@@packageDetails.vulnerability.heading">Vulnerabilities detected ({{
+      vulnerabilities.length }})</span>
+  </div>
+  <div class="explanation mt-2 text-xs leading-5 text-vscode-foreground"
+    i18n="@@packageDetails.vulnerability.description">This version of the package has vulnerabilities. Read the advisories and
+    decide if you should switch to another version.</div>
+  @for (vulnerability of vulnerabilities; track vulnerability) {
+  <div class="vulnerability mt-2 flex flex-wrap gap-x-1 text-xs">
+    <span class="label font-medium" i18n="@@packageDetails.vulnerability.advisoryLabel">Advisory ({{
+      vulnerability.severity | severity }}):</span>
+    <a class="break-all text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+      [href]="vulnerability.advisoryUrl">{{ vulnerability.advisoryUrl }}</a>
+  </div>
+  }
+</div>
+}

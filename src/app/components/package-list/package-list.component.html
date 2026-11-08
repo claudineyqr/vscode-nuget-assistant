@@ -1,0 +1,32 @@
+@if (showSelectCheckboxes) {
+<div class="select-all flex items-center justify-between border-b border-vscode-border px-3 py-2">
+  <label class="checkbox-with-label flex cursor-pointer select-none items-center gap-2 text-xs text-vscode-muted">
+    <input class="vscode-checkbox" type="checkbox" [checked]="areAllSelected" (change)="selectAll($event)" />
+    <span i18n="@@packageList.selectAll">Select all</span>
+  </label>
+  <button
+    type="button"
+    class="button inline-flex h-7 min-w-20 items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-medium text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+    (click)="updateSelected()" [disabled]="selectionService.isEmpty"
+    i18n="@@packageList.updateSelected.button">Update</button>
+</div>
+}
+@if (packages && packages.length) {
+<section class="package-list flex min-h-0 flex-col gap-1 overflow-y-auto py-1" aria-label="Packages"
+  i18n-aria-label="@@packageList.accessibleLabel">
+  @for (package of packages; track package) {
+  <app-package-row [package]="package" [isActive]="package.id === currentSelectedPackageId"
+    [isSelected]="selectionService.isSelected(package)" [showSelectionCheckbox]="showSelectCheckboxes"
+    (changeSelect)="$event ? selectRow(package) : deselectRow(package)"></app-package-row>
+  }
+</section>
+}
+
+@if (packages && !packages.length) {
+<div class="no-packages flex h-full min-h-24 items-center justify-center px-6 text-center text-sm text-vscode-muted"
+  i18n="@@packageList.emptyResult">No packages found for this query.</div>
+}
+
+@if (!packages) {
+<app-loading-spinner></app-loading-spinner>
+}

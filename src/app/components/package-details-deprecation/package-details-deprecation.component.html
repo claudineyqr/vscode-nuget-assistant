@@ -1,0 +1,29 @@
+@if (deprecation) {
+<div class="deprecation-container my-4 rounded-lg border border-vscode-warning/40 bg-vscode-warning/10 p-3">
+  <div class="header flex items-center gap-2 text-vscode-warning">
+    <fa-icon class="warning-icon" icon="triangle-exclamation"></fa-icon>
+    <span class="label text-xs font-semibold" i18n="@@packageDetails.deprecation.reasonsHeading">Deprecated ({{
+      reasons.join(', ') }})</span>
+  </div>
+  @if (deprecation.message) {
+  <div class="message mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-vscode-foreground">{{
+    deprecation.message }}</div>
+  }
+  <div class="more-info mt-2 text-xs">
+    <a class="text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+      [href]="packageInfoUrl" target="_blank" rel="noopener noreferrer">
+      <span i18n="@@packageDetails.deprecation.moreInfo">More info</span>
+    </a>
+  </div>
+  @if (deprecation.alternatePackage; as alternatePackage) {
+  <div class="alternate-package mt-2 text-xs">
+    <span class="label font-semibold" i18n="@@packageDetails.deprecation.alternatePackage">Alternate package:</span>
+    <span class="content ml-1 break-all">
+      <a class="text-vscode-accent underline decoration-vscode-accent/40 underline-offset-2 hover:decoration-vscode-accent"
+        href="#" (click)="searchAlternatePackage($event, alternatePackage.id)">{{ alternatePackage.id }} @if
+        (alternatePackageRange; as range) { {{ ' ' + range }} }</a>
+    </span>
+  </div>
+  }
+</div>
+}

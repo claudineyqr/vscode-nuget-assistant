@@ -1,0 +1,33 @@
+import * as vscode from 'vscode';
+import * as quickPick from './services/quick-pick';
+
+import UiPanel from './ui-panel';
+
+export function activate(context: vscode.ExtensionContext) {
+  const outputChannel = vscode.window.createOutputChannel('NuGet Assistant');
+  context.subscriptions.push(outputChannel, 
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('nuget-assistant.language')) {
+        UiPanel.reloadAllForLanguageChange();
+      }
+    }),
+    vscode.commands.registerCommand('nuget-assistant.managePackages', (uri: vscode.Uri) => {
+      UiPanel.createOrShow(context.extensionPath, uri, outputChannel, context.workspaceState);
+    }),
+    vscode.commands.registerCommand('nuget-assistant.managePackagesPalette', async () => {
+      const projectFileUri = await quickPick.pickProjectFile();
+      if (projectFileUri) {
+        UiPanel.createOrShow(context.extensionPath, projectFileUri, outputChannel, context.workspaceState);
+      }
+    }),
+    vscode.commands.registerCommand('nuget-assistant.manageSolutionPackages', (uri: vscode.Uri) => {
+      UiPanel.createOrShow(context.extensionPath, uri, outputChannel, context.workspaceState);
+    }),
+    vscode.commands.registerCommand('nuget-assistant.manageSolutionPackagesPalette', async () => {
+      const solutionFileUri = await quickPick.pickSolutionFile();
+      if (solutionFileUri) {
+        UiPanel.createOrShow(context.extensionPath, solutionFileUri, outputChannel, context.workspaceState);
+      }
+    })
+  );
+}

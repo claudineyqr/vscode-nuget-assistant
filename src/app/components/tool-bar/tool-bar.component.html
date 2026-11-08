@@ -1,0 +1,51 @@
+@if (searchForm) {
+<section class="toolbar flex items-center justify-between gap-3 px-3 py-2" aria-label="main toolbar"
+  i18n-aria-label="@@toolbar.accessibleLabel" [formGroup]="searchForm">
+  <div class="toolbar-start flex min-w-0 flex-1 items-center gap-2">
+    <label class="sr-only" for="package-search" i18n="@@toolbar.search.accessibleLabel">Search packages</label>
+    <div class="relative flex min-w-0 max-w-[500px] flex-1 items-center">
+      <svg aria-hidden="true" class="pointer-events-none absolute left-2.5 size-4 text-vscode-muted" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-4-4"></path>
+      </svg>
+      <input id="package-search" type="search"
+        class="search-box h-8 min-w-0 w-full rounded-md border border-vscode-input-border bg-vscode-input py-1 pl-8 pr-2.5 text-sm text-vscode-input-foreground placeholder:text-vscode-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        placeholder="Search" i18n-placeholder="@@toolbar.search.placeholder" formControlName="query" />
+    </div>
+    <button type="button"
+      class="button secondary inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="refresh()" title="Refresh packages" i18n-title="@@toolbar.refresh.title" aria-label="Refresh packages"
+      i18n-aria-label="@@toolbar.refresh.title">
+      <fa-icon icon="redo-alt"></fa-icon>
+    </button>
+    <span class="prerelease-checkbox flex shrink-0 items-center gap-1.5 text-xs text-vscode-muted">
+      <input class="vscode-checkbox" type="checkbox" formControlName="prerelease" id="prerelease" />
+      <label for="prerelease" i18n="@@toolbar.includePrerelease">Include prerelease versions</label>
+    </span>
+    @if (currentCategory === Category.Installed) {
+    <span class="prerelease-checkbox flex shrink-0 items-center gap-1.5 text-xs text-vscode-muted">
+      <input class="vscode-checkbox" type="checkbox" formControlName="showOnlyVulnerable" id="showOnlyVulnerable" />
+      <label for="showOnlyVulnerable" i18n="@@toolbar.showOnlyVulnerable">Show only vulnerable packages</label>
+    </span>
+    }
+  </div>
+  <div class="toolbar-end flex shrink-0 items-center gap-2">
+    <label class="source-title whitespace-nowrap text-xs text-vscode-muted" for="package-source"
+      i18n="@@toolbar.packageSource.label">Package source:</label>
+    <select id="package-source"
+      class="drop-down h-8 max-w-56 rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      formControlName="source">
+      @for (pkgSource of packageSources; track pkgSource) {
+      <option [ngValue]="pkgSource">{{ pkgSource.name }}</option>
+      }
+    </select>
+    <button type="button"
+      class="button secondary inline-flex size-8 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="reloadSources()" title="Reload package sources" i18n-title="@@toolbar.reloadSources.title"
+      aria-label="Reload package sources" i18n-aria-label="@@toolbar.reloadSources.title">
+      <fa-icon icon="sync-alt"></fa-icon>
+    </button>
+  </div>
+</section>
+}

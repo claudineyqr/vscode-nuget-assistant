@@ -73,12 +73,12 @@ To enable package searches on private feeds, add `Username` and `ClearTextPasswo
 ```xml
 <packageSourceCredentials>
   <Private>
-    <add key="Username" value="my-username" />
-    <add key="ClearTextPassword" value="my-password" />
+    <add key="Username" value="<YOUR-USERNAME>" />
+    <add key="ClearTextPassword" value="<YOUR-PASSWORD>" />
   </Private>
   <GitHub>
-    <add key="Username" value="github-username" />
-    <add key="ClearTextPassword" value="github-token-pat" />
+    <add key="Username" value="<YOUR-GITHUB-USERNAME>" />
+    <add key="ClearTextPassword" value="<YOUR-TOKEN>" />
   </GitHub>
 </packageSourceCredentials>
 ```

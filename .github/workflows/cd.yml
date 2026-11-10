@@ -82,10 +82,15 @@ jobs:
       - name: Generate Package VSIX
         run: npm run package
 
-      - name: Publish to marketplace
+      - name: Publish to Marketplace Visual Studio
         run: npm run publish
         env:
           VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
+
+      - name: Publish to Open VSX
+        run: npx --yes ovsx publish "nuget-assistant-${VERSION#v}.vsix"
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
 
   release:
     name: Release

@@ -114,6 +114,10 @@
   }
 }
 
+.main-section as-split.as-horizontal > .as-split-gutter {
+  background-color: var(--vscode-panel-border, var(--vscode-editorWidget-border, transparent));
+}
+
 @keyframes operation-spinner-rotate {
   to {
     transform: rotate(360deg);

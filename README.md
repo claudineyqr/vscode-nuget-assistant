@@ -85,6 +85,19 @@ To enable package searches on private feeds, add `Username` and `ClearTextPasswo
 
 > **Note:** Only `ClearTextPassword` is supported. Encrypted `Password` entries are ignored.
 
+You can avoid storing credentials directly in the config file by referencing environment variables using NuGet's `%NAME%` syntax. NuGet resolves these variables on Windows, macOS, and Linux:
+
+```xml
+<packageSourceCredentials>
+  <Private>
+    <add key="Username" value="%YOUR_USERNAME%" />
+    <add key="ClearTextPassword" value="%YOUR_PASSWORD%" />
+  </Private>
+</packageSourceCredentials>
+```
+
+If an environment variable is not defined, NuGet does not replace the placeholder and keeps the %NAME% value unchanged.
+
 ### Credentials over HTTP
 
 By default, NuGet Assistant blocks HTTP requests that would send credentials defined in `packageSourceCredentials`. HTTPS requests are not affected, and HTTP requests that do not include credentials continue to work normally.

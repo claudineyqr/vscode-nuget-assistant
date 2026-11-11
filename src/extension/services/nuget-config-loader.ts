@@ -40,27 +40,46 @@ export default class NuGetConfigLoader {
     const configPaths = await this.getConfigPathsAsync(projectFilePath);
     this.logger(`Loading NuGet configuration from ${configPaths.length} file(s).`);
     const sources = new Map<string, PackageSource>();
+    const disabledSources = new Map<string, boolean>();
     const credentials = new Map<string, SourceCredentials>();
 
-    for (const configPath of configPaths) {
+    const configResults = await Promise.all(configPaths.map(async (configPath) => {
       this.logger(`Reading ${configPath}`);
-      const content = await this.fileSystem.readFile(configPath, 'utf8');
-      let config: NuGetConfig;
       try {
-        config = (await xml2js.parseStringPromise(content)) as NuGetConfig;
+        const content = await this.fileSystem.readFile(configPath, 'utf8');
+        try {
+          const config = (await xml2js.parseStringPromise(content)) as NuGetConfig;
+          return { success: true as const, configPath, config };
+        } catch (error) {
+          return {
+            success: false as const,
+            error: new NuGetDataParsingError(localize('error.invalidNugetConfigXml', configPath, formatErrorMessage(error))),
+          };
+        }
       } catch (error) {
-        throw new NuGetDataParsingError(localize('error.invalidNugetConfigXml', configPath, formatErrorMessage(error)));
+        return { success: false as const, error };
       }
+    }));
+
+    for (const result of configResults) {
+      if (!result.success) {
+        throw result.error;
+      }
+
+      const { config } = result;
       this.applyPackageSources(config.configuration?.packageSources?.[0], sources);
+      this.applyDisabledPackageSources(config.configuration?.disabledPackageSources?.[0], disabledSources);
       this.applyCredentials(config.configuration?.packageSourceCredentials?.[0], credentials);
     }
 
-    return Array.from(sources.values()).map((source) => {
-      const sourceCredentials = credentials.get(this.normalizeSourceName(source.name));
-      const authorizationHeader = this.createAuthorizationHeader(sourceCredentials);
-      this.logger(`Source "${source.name}" authentication: ${authorizationHeader ? 'configured' : 'not configured'}.`);
-      return { ...source, authorizationHeader };
-    });
+    return Array.from(sources.values())
+      .filter((source) => !disabledSources.get(this.normalizeSourceName(source.name)))
+      .map((source) => {
+        const sourceCredentials = credentials.get(this.normalizeSourceName(source.name));
+        const authorizationHeader = this.createAuthorizationHeader(sourceCredentials);
+        this.logger(`Source "${source.name}" authentication: ${authorizationHeader ? 'configured' : 'not configured'}.`);
+        return { ...source, authorizationHeader };
+      });
   }
 
   private async getConfigPathsAsync(projectFilePath: string): Promise<string[]> {
@@ -90,13 +109,10 @@ export default class NuGetConfigLoader {
       currentFolder = parentFolder;
     }
 
-    for (const folder of ancestorFolders) {
-      const configPath = await this.findFileAsync(folder, 'NuGet.Config');
-      if (configPath) {
-        paths.push(configPath);
-      }
-    }
-
+    const ancestorConfigPaths = await Promise.all(
+      ancestorFolders.map((folder) => this.findFileAsync(folder, 'NuGet.Config'))
+    );
+    paths.push(...ancestorConfigPaths.filter((configPath): configPath is string => configPath !== undefined));
     return paths;
   }
 
@@ -150,6 +166,34 @@ export default class NuGetConfigLoader {
     }
   }
 
+  private applyDisabledPackageSources(
+    section: { add?: Array<XmlEntry>; clear?: unknown[]; remove?: Array<XmlEntry> } | undefined,
+    disabledSources: Map<string, boolean>
+  ): void {
+    if (!section) {
+      return;
+    }
+
+    if (section.clear) {
+      disabledSources.clear();
+    }
+
+    for (const entry of section.remove || []) {
+      const key = entry.$?.key;
+      if (key) {
+        disabledSources.delete(this.normalizeSourceName(key));
+      }
+    }
+
+    for (const entry of section.add || []) {
+      const key = entry.$?.key;
+      const value = entry.$?.value?.trim().toLowerCase();
+      if (key && (value === 'true' || value === 'false')) {
+        disabledSources.set(this.normalizeSourceName(key), value === 'true');
+      }
+    }
+  }
+
   private applyCredentials(
     sections: Record<string, Array<{ add?: Array<XmlEntry> }>> | undefined,
     credentials: Map<string, SourceCredentials>
@@ -163,15 +207,19 @@ export default class NuGetConfigLoader {
       for (const entry of entries[0]?.add || []) {
         const key = entry.$?.key?.toLowerCase();
         if (key === 'username') {
-          sourceCredentials.username = entry.$?.value;
+          sourceCredentials.username = this.expandEnvironmentVariables(entry.$?.value);
         } else if (key === 'cleartextpassword') {
-          sourceCredentials.clearTextPassword = entry.$?.value;
+          sourceCredentials.clearTextPassword = this.expandEnvironmentVariables(entry.$?.value);
         } else if (key === 'password') {
           this.logger(`Ignoring encrypted Password for source "${sourceName}"; only ClearTextPassword is supported.`);
         }
       }
       credentials.set(this.normalizeSourceName(sourceName), sourceCredentials);
     }
+  }
+
+  private expandEnvironmentVariables(value: string | undefined): string | undefined {
+    return value?.replace(/%([^%]+)%/g, (variable, name: string) => this.environment[name] ?? variable);
   }
 
   private normalizeSourceName(sourceName: string): string {

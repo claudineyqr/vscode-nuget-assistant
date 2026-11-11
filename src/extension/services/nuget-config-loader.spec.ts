@@ -42,8 +42,66 @@ describe('NuGetConfigLoader', () => {
 
     const loader = new NuGetConfigLoader({ APPDATA: appDataFolder });
 
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([]);
+  });
+
+  it('omits disabled sources while keeping enabled sources', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="nuget.org.v2" value="https://disabled.example/v2" /><add key="private" value="https://private.example/v3/index.json" /></packageSources><disabledPackageSources><add key="nuget.org.v2" value="true" /></disabledPackageSources></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({ APPDATA: appDataFolder });
+
     await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
-      { name: 'project', url: 'https://project.example/index.json', authorizationHeader: undefined },
+      { name: 'private', url: 'https://private.example/v3/index.json', authorizationHeader: undefined },
+    ]);
+  });
+
+  it('allows a later config to re-enable a disabled source with false', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="nuget.org.v2" value="https://nuget.example/v2" /></packageSources><disabledPackageSources><add key="nuget.org.v2" value="true" /></disabledPackageSources></configuration>`
+    );
+    await writeConfig(
+      path.join(projectFolder, 'NuGet.Config'),
+      `<configuration><disabledPackageSources><add key="nuget.org.v2" value="false" /></disabledPackageSources></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({ APPDATA: appDataFolder });
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      { name: 'nuget.org.v2', url: 'https://nuget.example/v2', authorizationHeader: undefined },
+    ]);
+  });
+
+  it('applies remove and clear to disabled package sources', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="removed" value="https://removed.example" /><add key="still-disabled" value="https://disabled.example" /></packageSources><disabledPackageSources><add key="removed" value="true" /><add key="still-disabled" value="true" /></disabledPackageSources></configuration>`
+    );
+    await writeConfig(
+      path.join(temporaryFolder, 'repo', 'NuGet.Config'),
+      `<configuration><disabledPackageSources><remove key="removed" /></disabledPackageSources></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({ APPDATA: appDataFolder });
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      { name: 'removed', url: 'https://removed.example', authorizationHeader: undefined },
+    ]);
+
+    await writeConfig(
+      path.join(projectFolder, 'NuGet.Config'),
+      `<configuration><disabledPackageSources><clear /></disabledPackageSources></configuration>`
+    );
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      { name: 'removed', url: 'https://removed.example', authorizationHeader: undefined },
+      { name: 'still-disabled', url: 'https://disabled.example', authorizationHeader: undefined },
     ]);
   });
 
@@ -125,6 +183,68 @@ describe('NuGetConfigLoader', () => {
         name: 'private',
         url: 'https://private.example/index.json',
         authorizationHeader: 'Basic dXNlcjpzZWNyZXQ=',
+      },
+    ]);
+  });
+
+  it('expands environment variables in usernames and clear text passwords', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="private" value="https://private.example/index.json" /></packageSources><packageSourceCredentials><private><add key="Username" value="%FEED_USERNAME%" /><add key="ClearTextPassword" value="%FEED_PASSWORD%" /></private></packageSourceCredentials></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({
+      APPDATA: appDataFolder,
+      FEED_USERNAME: 'feed-user',
+      FEED_PASSWORD: 'feed-secret',
+    });
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      {
+        name: 'private',
+        url: 'https://private.example/index.json',
+        authorizationHeader: 'Basic ZmVlZC11c2VyOmZlZWQtc2VjcmV0',
+      },
+    ]);
+  });
+
+  it('keeps missing variables literal and replaces empty variables with an empty value', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="private" value="https://private.example/index.json" /></packageSources><packageSourceCredentials><private><add key="Username" value="%MISSING_USERNAME%" /><add key="ClearTextPassword" value="%EMPTY_PASSWORD%" /></private></packageSourceCredentials></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({ APPDATA: appDataFolder, EMPTY_PASSWORD: '' });
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      {
+        name: 'private',
+        url: 'https://private.example/index.json',
+        authorizationHeader: 'Basic JU1JU1NJTkdfVVNFUk5BTUUlOg==',
+      },
+    ]);
+  });
+
+  it('expands environment variables only once', async () => {
+    await writeConfig(
+      path.join(appDataFolder, 'NuGet', 'NuGet.Config'),
+      `<configuration><packageSources><add key="private" value="https://private.example/index.json" /></packageSources><packageSourceCredentials><private><add key="Username" value="user" /><add key="ClearTextPassword" value="%FEED_PASSWORD%" /></private></packageSourceCredentials></configuration>`
+    );
+    const projectFilePath = path.join(projectFolder, 'project.csproj');
+    await fs.promises.writeFile(projectFilePath, '');
+    const loader = new NuGetConfigLoader({
+      APPDATA: appDataFolder,
+      FEED_PASSWORD: '%NESTED_PASSWORD%',
+      NESTED_PASSWORD: 'should-not-be-expanded',
+    });
+
+    await expect(loader.loadAsync(projectFilePath)).resolves.toEqual([
+      {
+        name: 'private',
+        url: 'https://private.example/index.json',
+        authorizationHeader: 'Basic dXNlcjolTkVTVEVEX1BBU1NXT1JEJQ==',
       },
     ]);
   });

@@ -83,7 +83,7 @@ jobs:
         run: npm run package
 
       - name: Publish to Marketplace Visual Studio
-        run: npm run publish
+        run: npm run publish -- --packagePath "nuget-assistant-${VERSION#v}.vsix"
         env:
           VSCE_PAT: ${{ secrets.MARKETPLACE_TOKEN }}
 

@@ -43,7 +43,7 @@
     "packageList.selectAll": "Select all",
     "packageList.updateSelected.button": "Update",
     "packageList.accessibleLabel": "Packages",
-    "packageList.emptyResult": "No packages found for this query.",
+    "packageList.emptyResult": "No packages found",
     "packageRow.selectCheckbox.label": "Select {$INTERPOLATION}",
     "packageRow.selectButton.accessibleLabel": "Select package {$INTERPOLATION}",
     "package.verified.tooltip": "The ID prefix of this package has been reserved for the owner of the package by the currently selected feed.",

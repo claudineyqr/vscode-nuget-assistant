@@ -41,7 +41,7 @@
     "packageDetails.vulnerability.description": "Esta versão do pacote tem vulnerabilidades. Leia os avisos e decida se deseja mudar para outra versão.",
     "packageDetails.vulnerability.heading": "Vulnerabilidades detectadas ({$INTERPOLATION})",
     "packageList.accessibleLabel": "Pacotes",
-    "packageList.emptyResult": "Nenhum pacote encontrado para esta pesquisa.",
+    "packageList.emptyResult": "Nenhum pacote encontrado",
     "packageList.selectAll": "Selecionar tudo",
     "packageList.updateSelected.button": "Atualizar",
     "packageRow.authors.prefix": "por {$INTERPOLATION}",

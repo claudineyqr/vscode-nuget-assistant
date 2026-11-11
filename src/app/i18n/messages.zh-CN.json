@@ -41,7 +41,7 @@
     "packageDetails.vulnerability.description": "此版本的包存在漏洞。请阅读相关安全公告，并决定是否应切换到其他版本。",
     "packageDetails.vulnerability.heading": "已检测到漏洞（{$INTERPOLATION}）",
     "packageList.accessibleLabel": "包",
-    "packageList.emptyResult": "未找到符合此查询的包。",
+    "packageList.emptyResult": "未找到包。",
     "packageList.selectAll": "全选",
     "packageList.updateSelected.button": "更新",
     "packageRow.authors.prefix": "{$INTERPOLATION} 提供",

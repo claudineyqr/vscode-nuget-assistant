@@ -13,3 +13,6 @@ https://learn.microsoft.com/en-us/nuget/api/registration-base-url-resource
 ## Project NuGet Gallery
 
 https://github.com/nuget/nugetgallery
+
+##  NuGet.Config reference
+https://learn.microsoft.com/en-us/nuget/reference/nuget-config-file

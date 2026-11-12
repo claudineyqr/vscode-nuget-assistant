@@ -94,6 +94,14 @@ describe('PackageRowComponent warning indicator', () => {
     expect(fixture.nativeElement.textContent).toContain('2.0.0');
   });
 
+  it('hides row operation buttons when project selection is handled in solution details', () => {
+    fixture.componentInstance.package = createPackageRow({ isInstalled: true, isOutdated: true });
+    fixture.componentInstance.hideOperationButtons = true;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.actions')).toBeNull();
+  });
+
   it('shows an additional warning beside the installed version using that version metadata', () => {
     fixture.componentInstance.package = createPackageRow({
       version: '2.0.0',

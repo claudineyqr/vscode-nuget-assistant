@@ -9,10 +9,12 @@ describe('PackageListComponent selection', () => {
   const packages = new BehaviorSubject<PackageRowModel[] | null>(null);
   const selectedPackageId = new BehaviorSubject<string | null>(null);
   const category = new BehaviorSubject<Category>(Category.Browse);
+  const solutionMode = new BehaviorSubject(false);
   const packageManager = {
     currentPackages: packages,
     currentSelectedPackageId: selectedPackageId,
     currentCategory: category,
+    isSolutionMode: solutionMode,
     installPackages: jest.fn(),
   };
 
@@ -20,6 +22,7 @@ describe('PackageListComponent selection', () => {
     packages.next(null);
     selectedPackageId.next(null);
     category.next(Category.Browse);
+    solutionMode.next(false);
     jest.clearAllMocks();
     await TestBed.configureTestingModule({
       imports: [PackageListComponent],
@@ -71,5 +74,14 @@ describe('PackageListComponent selection', () => {
     expect(component.showSelectCheckboxes).toBe(true);
     category.next(Category.Browse);
     expect(component.showSelectCheckboxes).toBe(false);
+  });
+
+  it('passes solution mode to package rows so their operation buttons are hidden', () => {
+    const fixture = TestBed.createComponent(PackageListComponent);
+    fixture.detectChanges();
+
+    solutionMode.next(true);
+
+    expect(fixture.componentInstance.isSolutionMode).toBe(true);
   });
 });

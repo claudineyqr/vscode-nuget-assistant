@@ -73,6 +73,7 @@
       </span>
     </div>
   </button>
+  @if (!hideOperationButtons) {
   <div
     class="actions flex shrink-0 flex-col items-end justify-between gap-1 opacity-100 transition-opacity motion-reduce:transition-none md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
     @if (!package.isInstalled) {
@@ -100,5 +101,6 @@
     </button>
     }
   </div>
+  }
 </div>
 }

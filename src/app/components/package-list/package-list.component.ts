@@ -27,6 +27,8 @@ export class PackageListComponent extends BaseComponent implements OnInit {
 
   public currentSelectedPackageId: string | null = null;
 
+  public isSolutionMode = false;
+
   public get showSelectCheckboxes(): boolean {
     return this.currentSelectedCategory === Category.Updates && this.packages !== null && this.packages.length > 0;
   }
@@ -46,6 +48,9 @@ export class PackageListComponent extends BaseComponent implements OnInit {
     this.listenForCurrentPackages();
     this.listenForCurrentSelectedPackage();
     this.listenForSelectedCategory();
+    this.subscriptions.add(this.packageManager.isSolutionMode.subscribe((isSolutionMode) => {
+      this.isSolutionMode = isSolutionMode;
+    }));
   }
 
   public selectAll(event: Event): void {

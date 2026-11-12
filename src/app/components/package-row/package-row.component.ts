@@ -30,6 +30,9 @@ export class PackageRowComponent {
   @Input()
   public isSelected = false;
 
+  @Input()
+  public hideOperationButtons = false;
+
   @Output()
   public changeSelect = new EventEmitter<boolean>();
 

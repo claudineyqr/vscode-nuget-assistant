@@ -16,6 +16,7 @@
   i18n-aria-label="@@packageList.accessibleLabel">
   @for (package of packages; track package) {
   <app-package-row [package]="package" [isActive]="package.id === currentSelectedPackageId"
+    [hideOperationButtons]="isSolutionMode"
     [isSelected]="selectionService.isSelected(package)" [showSelectionCheckbox]="showSelectCheckboxes"
     (changeSelect)="$event ? selectRow(package) : deselectRow(package)"></app-package-row>
   }

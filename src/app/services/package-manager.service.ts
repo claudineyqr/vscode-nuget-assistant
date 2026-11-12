@@ -42,6 +42,11 @@ export class PackageManagerService {
     return this._currentProjects.asObservable();
   }
 
+  private readonly _isSolutionMode = new BehaviorSubject<boolean>(false);
+  public get isSolutionMode(): Observable<boolean> {
+    return this._isSolutionMode.asObservable();
+  }
+
   private readonly _selectedProjectPaths = new BehaviorSubject<string[]>([]);
   public get selectedProjectPaths(): Observable<string[]> {
     return this._selectedProjectPaths.asObservable();
@@ -164,6 +169,7 @@ export class PackageManagerService {
   }
 
   public changeCurrentProject(project: Project) {
+    this._isSolutionMode.next(false);
     this._currentProject.next(project);
     this._currentProjects.next([project]);
     this._selectedProjectPaths.next([project.fsPath]);
@@ -175,6 +181,7 @@ export class PackageManagerService {
   }
 
   public changeCurrentProjectSet(projectSet: ProjectSet): void {
+    this._isSolutionMode.next(true);
     const availableProjectPaths = new Set(projectSet.projects.map((project) => project.fsPath));
     const selectedProjectPaths = this._selectedProjectPaths.value.filter((projectPath) => availableProjectPaths.has(projectPath));
 

@@ -141,6 +141,23 @@ describe('PackageManagerService', () => {
     service.changeCurrentProject(expectedProject);
   });
 
+  test('tracks whether the current context is a solution', () => {
+    const firstProject = getMockCurrentProject();
+    const projectSet: ProjectSet = {
+      name: 'Sample.sln',
+      fsPath: '/path/Sample.sln',
+      projects: [firstProject],
+    };
+
+    const values: boolean[] = [];
+    const subscription = service.isSolutionMode.subscribe((isSolutionMode) => values.push(isSolutionMode));
+    service.changeCurrentProjectSet(projectSet);
+    service.changeCurrentProject(firstProject);
+    subscription.unsubscribe();
+
+    expect(values).toEqual([false, true, false]);
+  });
+
   test('changeCurrentProjectSet should use the solution as the current context', (done) => {
     const firstProject = getMockCurrentProject();
     const secondProject: Project = { ...getMockCurrentProject(), name: 'Second.csproj', fsPath: '/path/Second.csproj' };

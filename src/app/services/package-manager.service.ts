@@ -3,10 +3,11 @@ import { BehaviorSubject, catchError, forkJoin, map, Observable, of, Subject, Su
 
 import { Category } from '../models/category';
 import { PackageRowModel } from '../models/package-row-model';
+import { CatalogEntry } from '../models/package-meta';
 import { PackageSource } from '../../shared/models/package-source';
 import { InstalledPackage, Project, ProjectSet } from '../../shared/models/project';
 import { PackageOperationStatus } from '../../shared/models/extension-message';
-import { InstallMessage, UninstallMessage } from '../../shared/models/ui-message';
+import { InstallMessage, InstallPackagesMessage, UninstallMessage } from '../../shared/models/ui-message';
 import { NuGetApiService } from './nuget-api.service';
 import { VscodeService } from './vscode.service';
 import { ALL_PACKAGE_SOURCES, NUGET_ORG } from '../models/constants';
@@ -120,19 +121,36 @@ export class PackageManagerService {
       const currentInstalledPackageIds = this.getCurrentInstalledPackageIds();
       if (currentInstalledPackageIds.length) {
         const requiredVersions = this.getInstalledVersionsById();
-        const search = isAllSources
-          ? this.nugetService.searchByPackageIdsAll(currentInstalledPackageIds, query, prerelease, sources, requiredVersions)
-          : this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, source, requiredVersions);
-        this.activeSearchSubscription = search.subscribe({
-          next: (packageRowModels: PackageRowModel[]) => {
-            this.setInstalledInformation(packageRowModels);
-            packageRowModels = this.filterResultsToMatchCategory(packageRowModels);
-            this._currentPackages.next(packageRowModels);
-          },
-          error: () => {
-            this._currentPackages.next([]);
-          },
-        });
+        if (currentCategory === Category.Installed) {
+          const sourceSearches = sources.map((packageSource) =>
+            this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, packageSource, requiredVersions).pipe(
+              catchError(() => of([] as PackageRowModel[]))
+            )
+          );
+          this.activeSearchSubscription = forkJoin(sourceSearches).subscribe({
+            next: (sourceResults) => {
+              const packageRowModels = this.mergeInstalledPackageRows(sourceResults, query);
+              this._currentPackages.next(this.filterResultsToMatchCategory(packageRowModels));
+            },
+            error: () => {
+              this._currentPackages.next(this.filterResultsToMatchCategory(this.createLocalInstalledPackageRows(query)));
+            },
+          });
+        } else {
+          const search = isAllSources
+            ? this.nugetService.searchByPackageIdsAll(currentInstalledPackageIds, query, prerelease, sources, requiredVersions)
+            : this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, source, requiredVersions);
+          this.activeSearchSubscription = search.subscribe({
+            next: (packageRowModels: PackageRowModel[]) => {
+              this.setInstalledInformation(packageRowModels);
+              packageRowModels = this.filterResultsToMatchCategory(packageRowModels);
+              this._currentPackages.next(packageRowModels);
+            },
+            error: () => {
+              this._currentPackages.next([]);
+            },
+          });
+        }
       } else {
         this._currentPackages.next([]);
       }
@@ -281,7 +299,10 @@ export class PackageManagerService {
       )
     );
 
-    this.vscodeService.postMessages(installMessages);
+    this.vscodeService.postMessage({
+      command: 'add-packages',
+      packages: installMessages,
+    } as InstallPackagesMessage);
   }
 
   public uninstallPackage(packageToUninstall: PackageRowModel | null) {
@@ -390,6 +411,83 @@ export class PackageManagerService {
       });
     });
     return installedVersions;
+  }
+
+  private mergeInstalledPackageRows(sourceResults: PackageRowModel[][], query: string): PackageRowModel[] {
+    const localRows = this.createLocalInstalledPackageRows('');
+    const packageRows = localRows.map((localRow) => {
+      const packageId = localRow.id.toLowerCase();
+      const sourceRow = sourceResults
+        .map((rows) => rows.find((row) => row.id.toLowerCase() === packageId))
+        .find((row) => row?.versions?.some((version) => version.version === localRow.installedVersion));
+      return sourceRow ?? localRow;
+    });
+
+    this.setInstalledInformation(packageRows);
+    return packageRows
+      .filter((row) => row.sourceUrl !== '' || this.matchesLocalInstalledPackageQuery(row.id, query))
+      .sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  private createLocalInstalledPackageRows(query: string): PackageRowModel[] {
+    const installedById = new Map<string, { installedPackage: InstalledPackage; projectPaths: string[] }>();
+    this._currentProjects.value.forEach((project) => {
+      project.packages.forEach((installedPackage) => {
+        const packageId = installedPackage.id.toLowerCase();
+        const existing = installedById.get(packageId);
+        if (existing) {
+          if (!existing.projectPaths.includes(project.fsPath)) {
+            existing.projectPaths.push(project.fsPath);
+          }
+        } else {
+          installedById.set(packageId, { installedPackage, projectPaths: [project.fsPath] });
+        }
+      });
+    });
+
+    return Array.from(installedById.values())
+      .map(({ installedPackage, projectPaths }) => {
+        const installedVersion = installedPackage.version;
+        const installedVersionMetadata: CatalogEntry = {
+          '@id': '',
+          id: installedPackage.id,
+          version: installedVersion,
+          description: '',
+          authors: '',
+          iconUrl: '',
+          licenseUrl: '',
+          projectUrl: '',
+          tags: '',
+          dependencyGroups: undefined,
+          published: '',
+          listed: true,
+          vulnerabilities: undefined,
+        };
+        return {
+          id: installedPackage.id,
+          version: installedVersion,
+          description: '',
+          authors: '',
+          iconUrl: '',
+          verified: false,
+          deprecation: undefined,
+          vulnerabilities: undefined,
+          installedVersion,
+          installedVersionMetadata,
+          installedProjectPaths: projectPaths,
+          isInstalled: true,
+          isOutdated: false,
+          sourceUrl: '',
+          versions: [installedVersionMetadata],
+        };
+      })
+      .filter((row) => this.matchesLocalInstalledPackageQuery(row.id, query))
+      .sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  private matchesLocalInstalledPackageQuery(packageId: string, query: string): boolean {
+    const normalizedQuery = query.trim().toLowerCase().replace(/^packageid:\s*/, '').trim();
+    return !normalizedQuery || packageId.toLowerCase().includes(normalizedQuery);
   }
 
   private filterResultsToMatchCategory(packageRowModels: PackageRowModel[]): PackageRowModel[] {

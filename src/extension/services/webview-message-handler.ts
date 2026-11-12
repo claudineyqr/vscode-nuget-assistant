@@ -1,5 +1,5 @@
 import { ExtensionMessage } from '../../shared/models/extension-message';
-import { InstallMessage, NuGetHttpRequestMessage, UninstallMessage } from '../../shared/models/ui-message';
+import { InstallMessage, InstallPackagesMessage, NuGetHttpRequestMessage, UninstallMessage } from '../../shared/models/ui-message';
 import { formatErrorMessage } from '../../shared/utils/error-message';
 import { localize } from './localization';
 import { isNuGetDataParsingError } from '../../shared/utils/nuget-data-parsing-error';
@@ -102,6 +102,9 @@ export default class WebviewMessageHandler {
       case 'add-package':
         this.addPackage(message as unknown as InstallMessage);
         return;
+      case 'add-packages':
+        this.addPackages(message as unknown as InstallPackagesMessage);
+        return;
       case 'remove-package':
         this.removePackage(message as unknown as UninstallMessage);
         return;
@@ -169,6 +172,17 @@ export default class WebviewMessageHandler {
     });
   }
 
+  private addPackages(message: InstallPackagesMessage): void {
+    if (!Array.isArray(message.packages)) {
+      return;
+    }
+    message.packages.forEach((packageMessage) => {
+      if (isRecord(packageMessage)) {
+        this.addPackage(packageMessage as unknown as InstallMessage);
+      }
+    });
+  }
+
   private removePackage(message: UninstallMessage): void {
     if (!isValidPackageId(message.packageId)) {
       return;
@@ -224,27 +238,28 @@ export default class WebviewMessageHandler {
     return task;
   }
 
-  private loadProject(): Promise<void> {
+  private async loadProject(): Promise<void> {
     const projectFileExtension = this.projectFilePath.toLowerCase().slice(this.projectFilePath.lastIndexOf('.'));
     const isSolution = projectFileExtension === '.sln' || projectFileExtension === '.slnx';
     const projectLoad: Promise<ExtensionMessage> = isSolution
       ? this.solutionLoader.loadAsync(this.projectFilePath).then((projectSet) => ({ type: 'project-set', data: projectSet } satisfies ExtensionMessage))
       : this.projectFileLoader.loadProjectAsync(this.projectFilePath).then((project) => ({ type: 'project', data: project } satisfies ExtensionMessage));
 
-    return projectLoad.then((message) => {
-      this.webview.postMessage(message);
-    });
+    const message = await projectLoad;
+    await this.webview.postMessage(message);
   }
 
-  private reloadProjectAfterPackageOperations(): void {
-    void this.loadProject()
-      .then(() => this.webview.postMessage({ type: 'packages-changed' }))
-      .catch((error) => {
-        const details = this.getErrorMessage(error);
-        this.logHandledError(`Error reloading project after package operations: ${details}`, error);
-        vscode.window.showErrorMessage(localize('error.reloadProject', details));
-      })
-      .finally(() => this.webview.postMessage({ type: 'package-operation-complete' }));
+  private async reloadProjectAfterPackageOperations(): Promise<void> {
+    try {
+      await this.loadProject();
+      await this.webview.postMessage({ type: 'packages-changed' });
+    } catch (error) {
+      const details = this.getErrorMessage(error);
+      this.logHandledError(`Error reloading project after package operations: ${details}`, error);
+      vscode.window.showErrorMessage(localize('error.reloadProject', details));
+    } finally {
+      await this.webview.postMessage({ type: 'package-operation-complete' });
+    }
   }
 
   private loadConfiguration(): void {

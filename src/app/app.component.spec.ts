@@ -6,7 +6,7 @@ import { AppComponent } from './app.component';
 import { ExtensionMessage } from '../shared/models/extension-message';
 import { PackageSource } from '../shared/models/package-source';
 import { PackageManagerService } from './services/package-manager.service';
-import { Project } from '../shared/models/project';
+import { Project, ProjectSet } from '../shared/models/project';
 
 describe('AppComponent', () => {
   let component: AppComponent;
@@ -14,6 +14,7 @@ describe('AppComponent', () => {
   const currentPackageOperation = new BehaviorSubject<{ action: 'install' | 'update' | 'remove'; packageId: string } | null>(null);
   const packageManagerMock = {
     changeCurrentProject: jest.fn(),
+    changeCurrentProjectSet: jest.fn(),
     changeCurrentSources: jest.fn(),
     refreshCurrentPackages: jest.fn(),
     changeCurrentPackageOperation: jest.fn((operation) => currentPackageOperation.next(operation)),
@@ -92,6 +93,25 @@ describe('AppComponent', () => {
     window.dispatchEvent(event);
 
     expect(packageManagerMock.refreshCurrentPackages).toHaveBeenCalledWith(true);
+  });
+
+  test.each([
+    ['project', { type: 'project', data: { name: 'App.csproj', fsPath: '/App.csproj', packages: [] } as Project }],
+    ['solution', { type: 'project-set', data: { name: 'App.sln', fsPath: '/App.sln', projects: [] } as ProjectSet }],
+  ] as const)('refreshes the active package query after receiving the updated %s state', (_scope, projectMessage) => {
+    const changeProject = projectMessage.type === 'project'
+      ? packageManagerMock.changeCurrentProject
+      : packageManagerMock.changeCurrentProjectSet;
+    const event = new MessageEvent<ExtensionMessage>('message', { data: projectMessage });
+    window.dispatchEvent(event);
+
+    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
+      data: { type: 'packages-changed' },
+    }));
+
+    expect(changeProject).toHaveBeenCalledWith(projectMessage.data);
+    expect(packageManagerMock.refreshCurrentPackages).toHaveBeenCalledWith(true);
+    expect(changeProject.mock.invocationCallOrder[0]).toBeLessThan(packageManagerMock.refreshCurrentPackages.mock.invocationCallOrder[0]);
   });
 
   test.each([

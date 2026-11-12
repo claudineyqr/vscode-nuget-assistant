@@ -1,4 +1,5 @@
 import WebviewMessageHandler from './webview-message-handler';
+import * as vscode from 'vscode';
 import { EventEmitter } from 'node:events';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import * as path from 'node:path';
@@ -54,27 +55,34 @@ describe('WebviewMessageHandler NuGet request cancellation', () => {
 describe('WebviewMessageHandler package operation refresh', () => {
   it('reports package changes after the project reload finishes', async () => {
     const messageOrder: string[] = [];
+    let finishProjectPost: (() => void) | undefined;
     const webview = {
       postMessage: jest.fn((message: { type: string }) => {
         messageOrder.push(message.type);
+        if (message.type === 'project') {
+          return new Promise<boolean>((resolve) => {
+            finishProjectPost = () => resolve(true);
+          });
+        }
         return Promise.resolve(true);
       }),
     };
     const handler = Object.create(WebviewMessageHandler.prototype) as {
-      reloadProjectAfterPackageOperations(): void;
+      reloadProjectAfterPackageOperations(): Promise<void>;
       loadProject: jest.Mock;
       webview: typeof webview;
     };
     handler.webview = webview;
-    handler.loadProject = jest.fn(() =>
-      Promise.resolve().then(() => {
-        webview.postMessage({ type: 'project' });
-      })
-    );
+    handler.loadProject = jest.fn(async () => {
+      await webview.postMessage({ type: 'project' });
+    });
 
-    handler.reloadProjectAfterPackageOperations();
+    const reload = handler.reloadProjectAfterPackageOperations();
     await Promise.resolve();
-    await Promise.resolve();
+    expect(messageOrder).toEqual(['project']);
+
+    finishProjectPost?.();
+    await reload;
 
     expect(messageOrder).toEqual(['project', 'packages-changed', 'package-operation-complete']);
   });
@@ -82,7 +90,7 @@ describe('WebviewMessageHandler package operation refresh', () => {
   it('clears the operation indicator when reloading the project fails', async () => {
     const webview = { postMessage: jest.fn(() => Promise.resolve(true)) };
     const handler = Object.create(WebviewMessageHandler.prototype) as {
-      reloadProjectAfterPackageOperations(): void;
+      reloadProjectAfterPackageOperations(): Promise<void>;
       loadProject: jest.Mock;
       webview: typeof webview;
       getErrorMessage: jest.Mock;
@@ -93,12 +101,68 @@ describe('WebviewMessageHandler package operation refresh', () => {
     handler.getErrorMessage = jest.fn(() => 'reload failed');
     handler.log = jest.fn();
 
-    handler.reloadProjectAfterPackageOperations();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await handler.reloadProjectAfterPackageOperations();
 
     expect(handler.log).toHaveBeenCalledWith(expect.stringContaining('reload failed'));
     expect(webview.postMessage).toHaveBeenCalledWith({ type: 'package-operation-complete' });
     expect(webview.postMessage).not.toHaveBeenCalledWith({ type: 'packages-changed' });
+  });
+});
+
+describe('WebviewMessageHandler batched package operations', () => {
+  it('queues every package from one webview message before the task queue can drain', () => {
+    const projectFilePath = path.resolve('workspace', 'demo.csproj');
+    const taskManager = { executeTask: jest.fn() };
+    const vscodeApi = vscode as unknown as { ShellQuoting?: { Strong: number } };
+    const shellQuotingDescriptor = Object.getOwnPropertyDescriptor(vscodeApi, 'ShellQuoting');
+    Object.defineProperty(vscodeApi, 'ShellQuoting', { configurable: true, value: { Strong: 1 } });
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), {
+      configuredSources: [{ name: 'test', url: 'https://packages.example/v3/index.json' }],
+      projectFilePath,
+      solutionLoader: { readProjectPaths: jest.fn() },
+      taskManager,
+      createTask: jest.fn((command: string, args: unknown[]) => ({ command, args })),
+    }) as { handleMessage(message: unknown): void };
+
+    try {
+      handler.handleMessage({
+        command: 'add-packages',
+        packages: [
+          null,
+          ...['Package1', 'Package2'].map((packageId) => ({
+            command: 'add-package',
+            projectName: projectFilePath,
+            packageId,
+            packageVersion: '1.0.0',
+            packageSourceUrl: 'https://packages.example/v3/index.json',
+            operation: 'update',
+          })),
+        ],
+      });
+    } finally {
+      if (shellQuotingDescriptor) {
+        Object.defineProperty(vscodeApi, 'ShellQuoting', shellQuotingDescriptor);
+      } else {
+        delete vscodeApi.ShellQuoting;
+      }
+    }
+
+    expect(taskManager.executeTask).toHaveBeenCalledTimes(2);
+    expect(taskManager.executeTask.mock.calls.map(([, operation]) => operation)).toEqual([
+      { action: 'update', packageId: 'Package1' },
+      { action: 'update', packageId: 'Package2' },
+    ]);
+  });
+
+  it('ignores a batch without a package array', () => {
+    const taskManager = { executeTask: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), { taskManager }) as {
+      handleMessage(message: unknown): void;
+    };
+
+    handler.handleMessage({ command: 'add-packages', packages: null });
+
+    expect(taskManager.executeTask).not.toHaveBeenCalled();
   });
 });
 

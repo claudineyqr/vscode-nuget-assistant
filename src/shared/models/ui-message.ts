@@ -32,3 +32,8 @@ export interface InstallMessage extends UninstallMessage {
   packageSourceUrl: string;
   operation: 'install' | 'update';
 }
+
+export interface InstallPackagesMessage extends UIMessage {
+  command: 'add-packages';
+  packages: InstallMessage[];
+}

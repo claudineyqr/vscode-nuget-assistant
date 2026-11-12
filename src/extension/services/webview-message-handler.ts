@@ -181,7 +181,7 @@ export default class WebviewMessageHandler {
     }
     message.packages.forEach((packageMessage) => {
       if (isRecord(packageMessage)) {
-        this.addPackage(packageMessage as unknown as InstallMessage);
+        this.addPackage(packageMessage);
       }
     });
   }

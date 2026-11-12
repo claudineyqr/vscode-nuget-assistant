@@ -107,59 +107,11 @@ export class PackageManagerService {
     const sources = this._currentSources.value.length > 0 ? this._currentSources.value : [source === ALL_PACKAGE_SOURCES ? NUGET_ORG : source];
 
     if (currentCategory === Category.Browse) {
-      const search = isAllSources
-        ? this.nugetService.searchAll(query, prerelease, sources)
-        : this.nugetService.search(query, prerelease, source);
-      this.activeSearchSubscription = search.pipe(
-        map((packageRowModels) => {
-          this.setInstalledInformation(packageRowModels);
-          return packageRowModels;
-        }),
-        switchMap((packageRowModels) => this.loadInstalledVersionMetadata(packageRowModels, sources))
-      ).subscribe({
-        next: (packageRowModels) => this._currentPackages.next(packageRowModels),
-        error: () => {
-          this._currentPackages.next([]);
-        },
-      });
-    } else {
-      const currentInstalledPackageIds = this.getCurrentInstalledPackageIds();
-      if (currentInstalledPackageIds.length) {
-        const requiredVersions = this.getInstalledVersionsById();
-        if (currentCategory === Category.Installed) {
-          const sourceSearches = sources.map((packageSource) =>
-            this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, packageSource, requiredVersions).pipe(
-              catchError(() => of([] as PackageRowModel[]))
-            )
-          );
-          this.activeSearchSubscription = forkJoin(sourceSearches).subscribe({
-            next: (sourceResults) => {
-              const packageRowModels = this.mergeInstalledPackageRows(sourceResults, query);
-              this._currentPackages.next(this.filterResultsToMatchCategory(packageRowModels));
-            },
-            error: () => {
-              this._currentPackages.next(this.filterResultsToMatchCategory(this.createLocalInstalledPackageRows(query)));
-            },
-          });
-        } else {
-          const search = isAllSources
-            ? this.nugetService.searchByPackageIdsAll(currentInstalledPackageIds, query, prerelease, sources, requiredVersions)
-            : this.nugetService.searchByPackageIds(currentInstalledPackageIds, query, prerelease, source, requiredVersions);
-          this.activeSearchSubscription = search.subscribe({
-            next: (packageRowModels: PackageRowModel[]) => {
-              this.setInstalledInformation(packageRowModels);
-              packageRowModels = this.filterResultsToMatchCategory(packageRowModels);
-              this._currentPackages.next(packageRowModels);
-            },
-            error: () => {
-              this._currentPackages.next([]);
-            },
-          });
-        }
-      } else {
-        this._currentPackages.next([]);
-      }
+      this.searchBrowsePackages(query, prerelease, source, sources, isAllSources);
+      return;
     }
+
+    this.searchInstalledPackages(currentCategory, query, prerelease, source, sources, isAllSources);
   }
 
   public refreshCurrentPackages(preserveCurrentPackages = false): void {
@@ -357,6 +309,95 @@ export class PackageManagerService {
       projectPaths: projectPaths ?? this.getProjectPathsForMessage(this._selectedProjectPaths.value),
       operation: operation ?? (packageToInstall.isOutdated ? 'update' : 'install'),
     };
+  }
+
+  private searchBrowsePackages(
+    query: string,
+    prerelease: boolean,
+    source: PackageSource,
+    sources: PackageSource[],
+    isAllSources: boolean
+  ): void {
+    const search = isAllSources
+      ? this.nugetService.searchAll(query, prerelease, sources)
+      : this.nugetService.search(query, prerelease, source);
+    this.activeSearchSubscription = search.pipe(
+      map((packageRowModels) => {
+        this.setInstalledInformation(packageRowModels);
+        return packageRowModels;
+      }),
+      switchMap((packageRowModels) => this.loadInstalledVersionMetadata(packageRowModels, sources))
+    ).subscribe({
+      next: (packageRowModels) => this._currentPackages.next(packageRowModels),
+      error: () => this._currentPackages.next([]),
+    });
+  }
+
+  private searchInstalledPackages(
+    currentCategory: Category,
+    query: string,
+    prerelease: boolean,
+    source: PackageSource,
+    sources: PackageSource[],
+    isAllSources: boolean
+  ): void {
+    const installedPackageIds = this.getCurrentInstalledPackageIds();
+    if (!installedPackageIds.length) {
+      this._currentPackages.next([]);
+      return;
+    }
+
+    const requiredVersions = this.getInstalledVersionsById();
+    if (currentCategory === Category.Installed) {
+      this.searchInstalledCategory(installedPackageIds, query, prerelease, sources, requiredVersions);
+      return;
+    }
+
+    this.searchOtherInstalledCategory(installedPackageIds, query, prerelease, source, sources, isAllSources, requiredVersions);
+  }
+
+  private searchInstalledCategory(
+    installedPackageIds: string[],
+    query: string,
+    prerelease: boolean,
+    sources: PackageSource[],
+    requiredVersions: Record<string, string>
+  ): void {
+    const sourceSearches = sources.map((packageSource) =>
+      this.nugetService.searchByPackageIds(installedPackageIds, query, prerelease, packageSource, requiredVersions).pipe(
+        catchError(() => of([] as PackageRowModel[]))
+      )
+    );
+    this.activeSearchSubscription = forkJoin(sourceSearches).subscribe({
+      next: (sourceResults) => {
+        const packageRowModels = this.mergeInstalledPackageRows(sourceResults, query);
+        this._currentPackages.next(this.filterResultsToMatchCategory(packageRowModels));
+      },
+      error: () => {
+        this._currentPackages.next(this.filterResultsToMatchCategory(this.createLocalInstalledPackageRows(query)));
+      },
+    });
+  }
+
+  private searchOtherInstalledCategory(
+    installedPackageIds: string[],
+    query: string,
+    prerelease: boolean,
+    source: PackageSource,
+    sources: PackageSource[],
+    isAllSources: boolean,
+    requiredVersions: Record<string, string>
+  ): void {
+    const search = isAllSources
+      ? this.nugetService.searchByPackageIdsAll(installedPackageIds, query, prerelease, sources, requiredVersions)
+      : this.nugetService.searchByPackageIds(installedPackageIds, query, prerelease, source, requiredVersions);
+    this.activeSearchSubscription = search.subscribe({
+      next: (packageRowModels: PackageRowModel[]) => {
+        this.setInstalledInformation(packageRowModels);
+        this._currentPackages.next(this.filterResultsToMatchCategory(packageRowModels));
+      },
+      error: () => this._currentPackages.next([]),
+    });
   }
 
   private setInstalledInformation(packageRowModels: PackageRowModel[]): void {

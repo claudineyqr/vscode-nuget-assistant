@@ -14,7 +14,7 @@
         placeholder="Search" i18n-placeholder="@@toolbar.search.placeholder" formControlName="query" />
     </div>
     <button type="button"
-      class="button secondary inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="button secondary inline-flex size-8 shrink-0 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="refresh()" title="Refresh packages" i18n-title="@@toolbar.refresh.title" aria-label="Refresh packages"
       i18n-aria-label="@@toolbar.refresh.title">
       <fa-icon icon="redo-alt"></fa-icon>
@@ -41,7 +41,7 @@
       }
     </select>
     <button type="button"
-      class="button secondary inline-flex size-8 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="button secondary inline-flex size-8 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="reloadSources()" title="Reload package sources" i18n-title="@@toolbar.reloadSources.title"
       aria-label="Reload package sources" i18n-aria-label="@@toolbar.reloadSources.title">
       <fa-icon icon="sync-alt"></fa-icon>

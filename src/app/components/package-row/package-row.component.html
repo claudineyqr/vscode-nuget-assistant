@@ -11,7 +11,7 @@
     [checked]="isSelected" (change)="select($event)" />
   }
   <button type="button"
-    class="package-row-select flex min-w-0 flex-1 cursor-pointer items-start rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+    class="package-row-select flex min-w-0 flex-1 select-none cursor-pointer items-start rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
     aria-label="Select package {{ package.id }}" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
     (click)="click()">
     <div class="icon relative ml-0.5 mr-3 size-10 shrink-0 overflow-hidden rounded-md bg-vscode-secondary/60">
@@ -77,7 +77,7 @@
     class="actions flex shrink-0 flex-col items-end justify-between gap-1 opacity-100 transition-opacity motion-reduce:transition-none md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
     @if (!package.isInstalled) {
     <button
-      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="install($event)" title="Install {{ package.id }}" i18n-title="@@packageRow.installButton.label"
       aria-label="Install {{ package.id }}" i18n-aria-label="@@packageRow.installButton.label">
       <fa-icon icon="arrow-down"></fa-icon>
@@ -85,7 +85,7 @@
     }
     @if (package.isInstalled) {
     <button
-      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="uninstall($event)" title="Uninstall {{ package.id }}" i18n-title="@@packageRow.uninstallButton.label"
       aria-label="Uninstall {{ package.id }}" i18n-aria-label="@@packageRow.uninstallButton.label">
       <fa-icon icon="xmark"></fa-icon>
@@ -93,7 +93,7 @@
     }
     @if (package.isOutdated) {
     <button
-      class="button secondary inline-flex size-7 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="update($event)" title="Update {{ package.id }}" i18n-title="@@packageRow.updateButton.label"
       aria-label="Update {{ package.id }}" i18n-aria-label="@@packageRow.updateButton.label">
       <fa-icon icon="arrow-up"></fa-icon>

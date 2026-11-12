@@ -2,19 +2,19 @@
   aria-label="main navigation" i18n-aria-label="@@navigation.main.accessibleLabel">
   <div class="navbar-start flex shrink-0 items-center gap-1">
     <button
-      class="navbar-item category-button rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="navbar-item category-button select-none rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       [ngClass]="currentCategory === Category.Browse ? 'border-vscode-accent text-vscode-accent' : 'border-transparent text-vscode-muted hover:bg-vscode-hover hover:text-vscode-foreground'"
       (click)="categoryChange(Category.Browse)">
       <span i18n="@@navigation.browse.tab">Browse</span>
     </button>
     <button
-      class="navbar-item category-button rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="navbar-item category-button select-none rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       [ngClass]="currentCategory === Category.Installed ? 'border-vscode-accent text-vscode-accent' : 'border-transparent text-vscode-muted hover:bg-vscode-hover hover:text-vscode-foreground'"
       (click)="categoryChange(Category.Installed)" i18n="@@navigation.installed.tab">
       Installed
     </button>
     <button
-      class="navbar-item category-button rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      class="navbar-item category-button select-none rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       [ngClass]="currentCategory === Category.Updates ? 'border-vscode-accent text-vscode-accent' : 'border-transparent text-vscode-muted hover:bg-vscode-hover hover:text-vscode-foreground'"
       (click)="categoryChange(Category.Updates)" i18n="@@navigation.updates.tab">
       Updates

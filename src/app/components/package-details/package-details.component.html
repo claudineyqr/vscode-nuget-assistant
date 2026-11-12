@@ -26,7 +26,7 @@
         class="drop-down installed-version-display min-w-0 flex-1 truncate rounded-md border border-vscode-input-border bg-vscode-input px-2 py-1.5 text-sm text-vscode-input-foreground">{{
         package.installedVersion }}</span>
       <button
-        class="button inline-flex h-8 min-w-20 items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary px-3 text-xs font-medium text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        class="button inline-flex h-8 min-w-20 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary px-3 text-xs font-medium text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
         (click)="uninstall()" i18n="@@packageDetails.uninstall.button">Uninstall</button>
     </div>
     }
@@ -42,7 +42,7 @@
         }
       </select>
       <button
-        class="button inline-flex h-8 min-w-20 items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-semibold text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        class="button inline-flex h-8 min-w-20 select-none items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-semibold text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
         [disabled]="isSelectedVersionInstalled" (click)="install()">{{ package.isInstalled ? updateLabel : installLabel
         }}</button>
     </div>

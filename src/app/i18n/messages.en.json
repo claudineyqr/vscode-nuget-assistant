@@ -2,6 +2,8 @@
   "locale": "en-US",
   "translations": {
     "operation.status": " {$INTERPOLATION} {$INTERPOLATION_1}... ",
+    "operation.cancelButton": "Cancel",
+    "operation.cancelButtonAriaLabel": "Cancel operation",
     "operation.uninstalling": "Uninstalling",
     "operation.updating": "Updating",
     "operation.installing": "Installing",

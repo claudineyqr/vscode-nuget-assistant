@@ -37,3 +37,7 @@ export interface InstallPackagesMessage extends UIMessage {
   command: 'add-packages';
   packages: InstallMessage[];
 }
+
+export interface CancelPackageOperationMessage extends UIMessage {
+  command: 'cancel-package-operation';
+}

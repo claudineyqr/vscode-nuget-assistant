@@ -324,6 +324,10 @@ export class PackageManagerService {
     this._currentPackageOperation.next(operation);
   }
 
+  public cancelCurrentPackageOperation(): void {
+    this.vscodeService.postMessage({ command: 'cancel-package-operation' });
+  }
+
   private mapPackageToInstallMessage(
     packageToInstall: PackageRowModel,
     version?: string,

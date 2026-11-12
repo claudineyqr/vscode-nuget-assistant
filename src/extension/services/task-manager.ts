@@ -11,6 +11,7 @@ export class TaskManager {
   private readonly taskEndListener: vscode.Disposable;
   private currentExecution: vscode.TaskExecution | undefined;
   private isDisposed = false;
+  private cancellationRequested = false;
 
   constructor(
     private readonly operationChangedCallback: (operation: PackageOperationStatus) => void,
@@ -40,6 +41,16 @@ export class TaskManager {
     }
   }
 
+  public cancelTasks(): void {
+    if (this.currentTasks.length === 0) {
+      return;
+    }
+
+    this.cancellationRequested = true;
+    this.currentTasks.splice(1);
+    this.currentExecution?.terminate();
+  }
+
   private handleTaskEnded(taskEvent: vscode.TaskEndEvent): void {
     const activeTask = this.currentTasks[0];
     const isCurrentExecution = taskEvent.execution === this.currentExecution ||
@@ -54,8 +65,10 @@ export class TaskManager {
     if (this.currentTasks.length > 0) {
       this.executeCurrentTask(this.currentTasks[0]);
     } else if (this.isDisposed) {
+      this.cancellationRequested = false;
       this.taskEndListener.dispose();
     } else {
+      this.cancellationRequested = false;
       this.tasksFinishedCallback();
     }
   }
@@ -69,6 +82,9 @@ export class TaskManager {
       (execution) => {
         if (this.currentTasks[0] === queuedTask) {
           this.currentExecution = execution;
+          if (this.cancellationRequested) {
+            execution.terminate();
+          }
         }
       },
       (error: unknown) => {
@@ -82,8 +98,10 @@ export class TaskManager {
         if (this.currentTasks.length > 0) {
           this.executeCurrentTask(this.currentTasks[0]);
         } else if (this.isDisposed) {
+          this.cancellationRequested = false;
           this.taskEndListener.dispose();
         } else {
+          this.cancellationRequested = false;
           this.tasksFinishedCallback();
         }
       }

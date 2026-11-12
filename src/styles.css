@@ -19,6 +19,7 @@
   --color-vscode-input-foreground: var(--vscode-input-foreground, var(--vscode-foreground));
   --color-vscode-input-border: var(--vscode-input-border, var(--vscode-dropdown-border, transparent));
   --color-vscode-warning: var(--vscode-notificationsWarningIcon-foreground, #e0a526);
+  --color-vscode-error: var(--vscode-errorForeground, #f14c4c);
   --color-vscode-success: var(--vscode-testing-iconPassed, var(--vscode-foreground));
   --color-vscode-info: var(--vscode-editorInfo-foreground, var(--vscode-foreground));
   --color-vscode-focus: var(--vscode-focusBorder, var(--vscode-button-background));

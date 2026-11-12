@@ -9,10 +9,19 @@
       <span
         class="operation-spinner inline-block size-4 shrink-0 animate-[operation-spinner-rotate_0.8s_linear_infinite] rounded-full border-2 border-vscode-border border-t-vscode-accent motion-reduce:animate-none"
         aria-hidden="true"></span>
-      <span class="min-w-0 break-words" i18n="@@operation.status">
+      <span class="min-w-0 flex-1 break-words" i18n="@@operation.status">
         {{ getOperationLabel(operation.action) }}
         {{ operation.packageId }}...
       </span>
+      <button
+        type="button"
+        class="inline-flex h-7 shrink-0 select-none items-center justify-center rounded-md border border-vscode-error/40 bg-vscode-error/10 px-3 text-xs font-medium text-vscode-error transition-colors motion-reduce:transition-none hover:bg-vscode-error/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        (click)="cancelPackageOperation()"
+        i18n="@@operation.cancelButton"
+        aria-label="Cancel operation"
+        i18n-aria-label="@@operation.cancelButtonAriaLabel">
+        Cancel
+      </button>
     </output>
     }
   </section>

@@ -17,6 +17,7 @@ describe('AppComponent', () => {
     changeCurrentProjectSet: jest.fn(),
     changeCurrentSources: jest.fn(),
     refreshCurrentPackages: jest.fn(),
+    cancelCurrentPackageOperation: jest.fn(),
     changeCurrentPackageOperation: jest.fn((operation) => currentPackageOperation.next(operation)),
     currentPackageOperation,
   };
@@ -31,7 +32,7 @@ describe('AppComponent', () => {
         .overrideComponent(AppComponent, {
           set: {
             imports: [CommonModule],
-            template: '<output *ngIf="packageManager.currentPackageOperation | async as operation" class="package-operation flex items-center border-l-4" role="status" aria-live="polite" aria-atomic="true">{{ operation.action === "remove" ? "Uninstalling" : operation.action === "update" ? "Updating" : "Installing" }} {{ operation.packageId }}...</output>',
+            template: '<output *ngIf="packageManager.currentPackageOperation | async as operation" class="package-operation flex items-center border-l-4" role="status" aria-live="polite" aria-atomic="true">{{ operation.action === "remove" ? "Uninstalling" : operation.action === "update" ? "Updating" : "Installing" }} {{ operation.packageId }}... <button type="button" aria-label="Cancel operation" (click)="cancelPackageOperation()">Cancel</button></output>',
           },
         })
         .compileComponents();
@@ -128,6 +129,10 @@ describe('AppComponent', () => {
     expect(operationIndicator).not.toBeNull();
     expect(operationIndicator.textContent).toContain(`${label} Newtonsoft.Json...`);
     expect(operationIndicator.classList).toContain('border-l-4');
+    const cancelButton = operationIndicator.querySelector('button[aria-label="Cancel operation"]') as HTMLButtonElement;
+    expect(cancelButton).not.toBeNull();
+    cancelButton.click();
+    expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
 
     window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
       data: { type: 'package-operation-complete' },
@@ -135,5 +140,11 @@ describe('AppComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('output.package-operation')).toBeNull();
+  });
+
+  test('forwards cancellation requests to the package manager', () => {
+    component.cancelPackageOperation();
+
+    expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
   });
 });

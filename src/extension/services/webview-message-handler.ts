@@ -108,6 +108,9 @@ export default class WebviewMessageHandler {
       case 'remove-package':
         this.removePackage(message as unknown as UninstallMessage);
         return;
+      case 'cancel-package-operation':
+        this.taskManager.cancelTasks();
+        return;
       case 'load-project':
         void this.loadProject().catch((error) => {
           const details = this.getErrorMessage(error);

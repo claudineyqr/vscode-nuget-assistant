@@ -53,6 +53,17 @@ describe('WebviewMessageHandler NuGet request cancellation', () => {
 });
 
 describe('WebviewMessageHandler package operation refresh', () => {
+  it('forwards package operation cancellation to the task manager', () => {
+    const taskManager = { cancelTasks: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), { taskManager }) as {
+      handleMessage(message: unknown): void;
+    };
+
+    handler.handleMessage({ command: 'cancel-package-operation' });
+
+    expect(taskManager.cancelTasks).toHaveBeenCalledTimes(1);
+  });
+
   it('reports package changes after the project reload finishes', async () => {
     const messageOrder: string[] = [];
     let finishProjectPost: (() => void) | undefined;

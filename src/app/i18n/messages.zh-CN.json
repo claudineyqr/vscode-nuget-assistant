@@ -7,6 +7,8 @@
     "navigation.updates.tab": " 更新 ",
     "operation.installing": "正在安装",
     "operation.status": " {$INTERPOLATION} {$INTERPOLATION_1}... ",
+    "operation.cancelButton": "取消",
+    "operation.cancelButtonAriaLabel": "取消操作",
     "operation.uninstalling": "正在卸载",
     "operation.updating": "正在更新",
     "package.deprecatedLabel": "已弃用的包",

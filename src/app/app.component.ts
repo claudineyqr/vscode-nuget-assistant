@@ -32,6 +32,10 @@ export class AppComponent {
     return $localize`:@@operation.installing:Installing`;
   }
 
+  public cancelPackageOperation(): void {
+    this.packageManager.cancelCurrentPackageOperation();
+  }
+
   @HostListener('window:message', ['$event'])
   MessageFromExtension(event: MessageEvent<ExtensionMessage>) {
     const message = event.data;

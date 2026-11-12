@@ -113,6 +113,46 @@ describe('TaskManager package operation progress', () => {
     expect(listeners[0].disposable.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it('terminates the active task, discards queued tasks, and reports completion', async () => {
+    const finished = jest.fn();
+    const firstTask = { name: 'nuget-assistant' } as vscode.Task;
+    const secondTask = { name: 'nuget-assistant' } as vscode.Task;
+    const manager = new TaskManager(jest.fn(), finished);
+
+    manager.executeTask(firstTask, { action: 'update', packageId: 'Package1' });
+    manager.executeTask(secondTask, { action: 'update', packageId: 'Package2' });
+    await flushPromises();
+
+    const activeExecution = executions.get(firstTask) as vscode.TaskExecution & { terminate: jest.Mock };
+    activeExecution.terminate = jest.fn();
+    manager.cancelTasks();
+
+    expect(activeExecution.terminate).toHaveBeenCalledTimes(1);
+    expect(tasks.executeTask).toHaveBeenCalledTimes(1);
+
+    finishTask(firstTask);
+
+    expect(finished).toHaveBeenCalledTimes(1);
+    expect(tasks.executeTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('terminates a task if cancellation arrives before VS Code returns its execution', async () => {
+    let resolveExecution: ((execution: vscode.TaskExecution) => void) | undefined;
+    tasks.executeTask.mockImplementation(() => new Promise<vscode.TaskExecution>((resolve) => {
+      resolveExecution = resolve;
+    }));
+    const task = { name: 'nuget-assistant' } as vscode.Task;
+    const manager = new TaskManager(jest.fn(), jest.fn());
+    manager.executeTask(task, { action: 'install', packageId: 'Package1' });
+    manager.cancelTasks();
+
+    const execution = { task, terminate: jest.fn() } as unknown as vscode.TaskExecution;
+    resolveExecution?.(execution);
+    await flushPromises();
+
+    expect(execution.terminate).toHaveBeenCalledTimes(1);
+  });
+
   it('continues the queue if VS Code rejects a task start', async () => {
     const failedTask = { name: 'nuget-assistant' } as vscode.Task;
     const nextTask = { name: 'nuget-assistant' } as vscode.Task;

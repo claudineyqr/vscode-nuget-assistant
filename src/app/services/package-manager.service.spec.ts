@@ -53,6 +53,12 @@ describe('PackageManagerService', () => {
     expect(requestedQueries).toEqual(['packageid:AutoMapper']);
   });
 
+  test('sends a cancellation request to the extension', () => {
+    service.cancelCurrentPackageOperation();
+
+    expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith({ command: 'cancel-package-operation' });
+  });
+
   test('cancelOngoingRequests unsubscribes pending searches and package detail lookups', () => {
     const source = getMockPackageSource();
     const pendingSearch = new Subject<PackageRowModel[]>();

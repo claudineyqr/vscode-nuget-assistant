@@ -7,6 +7,8 @@
     "navigation.updates.tab": " Atualizações ",
     "operation.installing": "Instalando",
     "operation.status": " {$INTERPOLATION} {$INTERPOLATION_1}... ",
+    "operation.cancelButton": "Cancelar",
+    "operation.cancelButtonAriaLabel": "Cancelar operação",
     "operation.uninstalling": "Desinstalando",
     "operation.updating": "Atualizando",
     "package.deprecatedLabel": "Pacote descontinuado",

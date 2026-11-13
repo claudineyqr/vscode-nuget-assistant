@@ -12,7 +12,7 @@
   }
   <button type="button"
     class="package-row-select flex min-w-0 flex-1 select-none cursor-pointer items-start rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
-    aria-label="Select package {{ package.id }}" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
+    [attr.aria-label]="'Select package ' + package.id" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
     (click)="click()">
     <div class="icon relative ml-0.5 mr-3 size-10 shrink-0 overflow-hidden rounded-md bg-vscode-secondary/60">
       @if (package.iconUrl) {
@@ -80,7 +80,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="install($event)" title="Install {{ package.id }}" i18n-title="@@packageRow.installButton.label"
-      aria-label="Install {{ package.id }}" i18n-aria-label="@@packageRow.installButton.label">
+      [attr.aria-label]="'Install ' + package.id" i18n-aria-label="@@packageRow.installButton.label">
       <fa-icon icon="arrow-down"></fa-icon>
     </button>
     }
@@ -88,7 +88,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="uninstall($event)" title="Uninstall {{ package.id }}" i18n-title="@@packageRow.uninstallButton.label"
-      aria-label="Uninstall {{ package.id }}" i18n-aria-label="@@packageRow.uninstallButton.label">
+      [attr.aria-label]="'Uninstall ' + package.id" i18n-aria-label="@@packageRow.uninstallButton.label">
       <fa-icon icon="xmark"></fa-icon>
     </button>
     }
@@ -96,7 +96,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="update($event)" title="Update {{ package.id }}" i18n-title="@@packageRow.updateButton.label"
-      aria-label="Update {{ package.id }}" i18n-aria-label="@@packageRow.updateButton.label">
+      [attr.aria-label]="'Update ' + package.id" i18n-aria-label="@@packageRow.updateButton.label">
       <fa-icon icon="arrow-up"></fa-icon>
     </button>
     }

@@ -87,6 +87,7 @@ export class PackageManagerService {
   }
 
   public requestPackageSearch(packageId: string): void {
+    this.changeCurrentCategory(Category.Browse);
     this._packageSearchRequested.next(`packageid:${packageId}`);
   }
 

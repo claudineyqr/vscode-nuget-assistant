@@ -14,7 +14,7 @@
       <fa-icon class="placeholder-icon text-3xl text-vscode-muted" icon="cubes"></fa-icon>
       }
     </div>
-    <div class="name break-all text-lg font-semibold tracking-tight text-vscode-foreground">{{ package.id }}</div>
+    <div class="name min-w-0 break-all text-lg font-semibold tracking-tight text-vscode-foreground">{{ package.id }}</div>
   </div>
   <app-project-selection [packageToChange]="package"></app-project-selection>
   <div class="version-selection my-4 space-y-2 rounded-lg border border-vscode-border bg-vscode-secondary/20 p-3">
@@ -68,7 +68,7 @@
     <div class="details-row flex flex-wrap gap-x-2">
       <span class="label text-xs font-semibold text-vscode-muted"
         i18n="@@packageDetails.metadata.authors">Author(s):</span>
-      <span class="content">{{ selectedVersionObject.authors }}</span>
+      <span class="content min-w-0 break-all">{{ selectedVersionObject.authors }}</span>
     </div>
     }
     @if (selectedVersionObject.licenseUrl) {
@@ -108,7 +108,7 @@
     @if (selectedVersionObject.tags) {
     <div class="details-row flex flex-wrap gap-x-2">
       <span class="label text-xs font-semibold text-vscode-muted" i18n="@@packageDetails.tags.label">Tags:</span>
-      <span class="content">{{ selectedVersionObject.tags }}</span>
+      <span class="content min-w-0 break-all">{{ selectedVersionObject.tags }}</span>
     </div>
     }
     <app-package-details-dependencies

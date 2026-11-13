@@ -12,10 +12,11 @@ export class TaskManager {
   private currentExecution: vscode.TaskExecution | undefined;
   private isDisposed = false;
   private cancellationRequested = false;
+  private isFinishingTasks = false;
 
   constructor(
     private readonly operationChangedCallback: (operation: PackageOperationStatus) => void,
-    private readonly tasksFinishedCallback: () => void,
+    private readonly tasksFinishedCallback: () => void | Promise<void>,
     private readonly taskStartFailedCallback: (error: unknown, operation: PackageOperationStatus) => void = () => undefined
   ) {
     this.taskEndListener = vscode.tasks.onDidEndTask((taskEvent) => this.handleTaskEnded(taskEvent));
@@ -26,7 +27,7 @@ export class TaskManager {
       return;
     }
 
-    const shouldStartTask = this.currentTasks.length === 0;
+    const shouldStartTask = this.currentTasks.length === 0 && !this.isFinishingTasks;
     const queuedTask = { task, operation };
     this.currentTasks.push(queuedTask);
     if (shouldStartTask) {
@@ -43,6 +44,12 @@ export class TaskManager {
 
   public cancelTasks(): void {
     if (this.currentTasks.length === 0) {
+      return;
+    }
+
+    if (this.isFinishingTasks) {
+      this.currentTasks.splice(0);
+      this.cancellationRequested = false;
       return;
     }
 
@@ -64,12 +71,8 @@ export class TaskManager {
 
     if (this.currentTasks.length > 0) {
       this.executeCurrentTask(this.currentTasks[0]);
-    } else if (this.isDisposed) {
-      this.cancellationRequested = false;
-      this.taskEndListener.dispose();
     } else {
-      this.cancellationRequested = false;
-      this.tasksFinishedCallback();
+      this.finishTasks();
     }
   }
 
@@ -97,14 +100,36 @@ export class TaskManager {
         this.currentExecution = undefined;
         if (this.currentTasks.length > 0) {
           this.executeCurrentTask(this.currentTasks[0]);
-        } else if (this.isDisposed) {
-          this.cancellationRequested = false;
-          this.taskEndListener.dispose();
         } else {
-          this.cancellationRequested = false;
-          this.tasksFinishedCallback();
+          this.finishTasks();
         }
       }
     );
+  }
+
+  private finishTasks(): void {
+    if (this.isDisposed) {
+      this.cancellationRequested = false;
+      this.taskEndListener.dispose();
+      return;
+    }
+
+    this.isFinishingTasks = true;
+    this.cancellationRequested = false;
+    let completion: void | Promise<void>;
+    try {
+      completion = this.tasksFinishedCallback();
+    } catch {
+      completion = undefined;
+    }
+
+    void Promise.resolve(completion).catch(() => undefined).then(() => {
+      this.isFinishingTasks = false;
+      if (this.currentTasks.length > 0) {
+        this.executeCurrentTask(this.currentTasks[0]);
+      } else if (this.isDisposed) {
+        this.taskEndListener.dispose();
+      }
+    });
   }
 }

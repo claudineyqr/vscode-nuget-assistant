@@ -51,8 +51,38 @@ describe('TaskManager package operation progress', () => {
     expect(finished).not.toHaveBeenCalled();
 
     finishTask(secondTask);
+    await flushPromises();
 
     expect(finished).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for project reload before starting tasks queued during reload', async () => {
+    let finishReload: (() => void) | undefined;
+    const finished = jest.fn(() => new Promise<void>((resolve) => {
+      finishReload = resolve;
+    }));
+    const firstTask = { name: 'nuget-assistant' } as vscode.Task;
+    const secondTask = { name: 'nuget-assistant' } as vscode.Task;
+    const manager = new TaskManager(jest.fn(), finished);
+
+    manager.executeTask(firstTask, { action: 'install', packageId: 'Package1' });
+    await flushPromises();
+    finishTask(firstTask);
+    await flushPromises();
+
+    expect(finished).toHaveBeenCalledTimes(1);
+    expect(tasks.executeTask).toHaveBeenCalledTimes(1);
+
+    manager.executeTask(secondTask, { action: 'remove', packageId: 'Package2' });
+    expect(tasks.executeTask).toHaveBeenCalledTimes(1);
+
+    finishReload?.();
+    await flushPromises();
+    expect(tasks.executeTask).toHaveBeenLastCalledWith(secondTask);
+
+    finishTask(secondTask);
+    await flushPromises();
+    expect(finished).toHaveBeenCalledTimes(2);
   });
 
   it('does not advance another manager when a task with the same name ends', async () => {
@@ -68,12 +98,14 @@ describe('TaskManager package operation progress', () => {
     await flushPromises();
 
     finishTask(firstTask);
+    await flushPromises();
 
     expect(firstFinished).toHaveBeenCalledTimes(1);
     expect(secondFinished).not.toHaveBeenCalled();
     expect(tasks.executeTask).toHaveBeenCalledTimes(2);
 
     finishTask(secondTask);
+    await flushPromises();
 
     expect(secondFinished).toHaveBeenCalledTimes(1);
   });
@@ -131,6 +163,7 @@ describe('TaskManager package operation progress', () => {
     expect(tasks.executeTask).toHaveBeenCalledTimes(1);
 
     finishTask(firstTask);
+    await flushPromises();
 
     expect(finished).toHaveBeenCalledTimes(1);
     expect(tasks.executeTask).toHaveBeenCalledTimes(1);
@@ -176,6 +209,7 @@ describe('TaskManager package operation progress', () => {
     expect(tasks.executeTask).toHaveBeenLastCalledWith(nextTask);
 
     finishTask(nextTask);
+    await flushPromises();
 
     expect(finished).toHaveBeenCalledTimes(1);
   });

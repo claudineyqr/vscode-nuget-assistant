@@ -55,7 +55,11 @@ export class PackageDetailsComponent extends BaseComponent implements OnInit {
     if (!packageId || !version) {
       return undefined;
     }
-    return `https://www.nuget.org/packages/${encodeURIComponent(packageId)}/${encodeURIComponent(version)}/ReportAbuse`;
+    if (this.selectedVersionObject?.licenseUrl.includes('nuget.org')) {
+      return `https://www.nuget.org/packages/${encodeURIComponent(packageId)}/${encodeURIComponent(version)}/ReportAbuse`;
+    } else {
+      return undefined;
+    }
   }
 
   constructor(private readonly packageManager: PackageManagerService, @Inject(LOCALE_ID) locale: string) {

@@ -19,9 +19,9 @@ describe('PackageDetailsComponent', () => {
   });
 
   it('shows the deprecation notice without an icon beside the install button', async () => {
-    const deprecatedVersion = createVersion('1.0.0', { reasons: ['Legacy'], message: 'Use the newer package.' });
+    const deprecatedVersion = createVersion('1.0.0', { reasons: ['Legacy'], message: 'Use the newer package.' }, 'https://www.nuget.org/packages/Example.Package/license');
     deprecatedVersion.vulnerabilities = [{ advisoryUrl: 'https://example.test/advisory', severity: '3' }];
-    const regularVersion = createVersion('2.0.0');
+    const regularVersion = createVersion('2.0.0', undefined, 'https://licenses.example.test/Example.Package');
     regularVersion.vulnerabilities = [];
     const selectedPackage: PackageRowModel = {
       id: 'Example.Package',
@@ -64,7 +64,7 @@ describe('PackageDetailsComponent', () => {
 
     expect(fixture.nativeElement.querySelector('.version-container [title="Deprecated package"]')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('Use the newer package.');
-    expect(fixture.nativeElement.querySelector('a[href$="/packages/Example.Package/2.0.0/ReportAbuse"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href$="/packages/Example.Package/2.0.0/ReportAbuse"]')).toBeNull();
   });
 
   it('selects the installed version by default in the Installed category', async () => {
@@ -107,7 +107,7 @@ describe('PackageDetailsComponent', () => {
   });
 });
 
-function createVersion(version: string, deprecation?: CatalogEntry['deprecation']): CatalogEntry {
+function createVersion(version: string, deprecation?: CatalogEntry['deprecation'], licenseUrl = ''): CatalogEntry {
   return {
     '@id': '',
     id: 'Example.Package',
@@ -115,7 +115,7 @@ function createVersion(version: string, deprecation?: CatalogEntry['deprecation'
     description: 'Package description',
     authors: 'Example',
     iconUrl: '',
-    licenseUrl: '',
+    licenseUrl,
     projectUrl: '',
     tags: '',
     dependencyGroups: undefined,

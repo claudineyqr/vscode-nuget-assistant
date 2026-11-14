@@ -42,7 +42,7 @@ Configure these options in your VS Code User or Workspace settings:
 | `nuget-assistant.loggingLevel` | `None` | Output channel logging detail: `None` disables logging, `Information` logs routine activity, HTTP response status codes, and errors, `Error` logs errors only, and `Debug` logs routine activity and detailed HTTP requests and responses, including response bodies up to the configured limit. |
 | `nuget-assistant.debugResponseBodyLimitKb` | `32` | Maximum response body size, in KiB, written to the output channel when `loggingLevel` is `Debug`. Range: `0`–`5120`; set to `0` to omit response bodies. |
 | `nuget-assistant.allowInsecureHttpCredentials` | `false` | Allows NuGet source credentials to be sent over unencrypted HTTP connections. Enable only for trusted package sources and network environments. |
-| `nuget-assistant.packageExecutionMode` | `dotnet` | Choose how package changes are applied: through the .NET CLI or by editing C# project files directly. |
+| `nuget-assistant.packageExecutionMode` | `projectFile` | Choose how package changes are applied: through the .NET CLI or by editing C# project files directly. (`dotnet` or `projectFile`) |
 | `nuget-assistant.showTaskWindow` | `false` | Show package operation progress in the VS Code Tasks window. |
 
 ## Package Source Configuration

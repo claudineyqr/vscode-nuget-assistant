@@ -531,10 +531,10 @@ export default class WebviewMessageHandler {
   }
 
   private getPackageExecutionMode(): ExecutionMode {
-    const configuredMode = vscode.workspace.getConfiguration('nuget-assistant').get<unknown>('packageExecutionMode', ExecutionMode.Dotnet);
+    const configuredMode = vscode.workspace.getConfiguration('nuget-assistant').get<unknown>('packageExecutionMode', ExecutionMode.ProjectFile);
     return Object.values(ExecutionMode).includes(configuredMode as ExecutionMode)
       ? configuredMode as ExecutionMode
-      : ExecutionMode.Dotnet;
+      : ExecutionMode.ProjectFile;
   }
 
   private getRestoreFailureDetails(exitCode: number): string {

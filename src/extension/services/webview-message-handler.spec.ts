@@ -466,7 +466,7 @@ describe('WebviewMessageHandler project-file package operations', () => {
     expect(handler.createTask).toHaveBeenCalledWith('add', expect.any(Array));
   });
 
-  it('falls back to dotnet for an invalid configured execution mode', () => {
+  it('falls back to project-file mode for an invalid configured execution mode', () => {
     const getConfigurationDescriptor = Object.getOwnPropertyDescriptor(vscode.workspace, 'getConfiguration');
     Object.defineProperty(vscode.workspace, 'getConfiguration', {
       configurable: true,
@@ -475,7 +475,7 @@ describe('WebviewMessageHandler project-file package operations', () => {
     const handler = Object.create(WebviewMessageHandler.prototype) as { getPackageExecutionMode(): ExecutionMode };
 
     try {
-      expect(handler.getPackageExecutionMode()).toBe(ExecutionMode.Dotnet);
+      expect(handler.getPackageExecutionMode()).toBe(ExecutionMode.ProjectFile);
     } finally {
       if (getConfigurationDescriptor) {
         Object.defineProperty(vscode.workspace, 'getConfiguration', getConfigurationDescriptor);

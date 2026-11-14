@@ -25,6 +25,7 @@ You can also launch these commands from the Command Palette (`Ctrl+Shift+P`) by 
 - Choose how package changes are applied: with the .NET CLI (`dotnet`) or by editing project files (`projectFile`).
 - View package details, including descriptions, authors, licenses, dependencies, tags, and project links.
 - View known vulnerabilities and related security advisories.
+- Support for Central Package Management: NuGet Assistant can add, update, and remove package references in projects that use Directory.Packages.props to centrally manage package versions.
 - Supports NuGet V2 and V3 feeds, including nuget.org, Azure Artifacts, GitHub Packages, GitLab, MyGet, JFrog Artifactory, Sonatype Nexus, ProGet, and other compatible private feeds.
 - Works on Linux, macOS, and Windows.
 - Fits naturally into your VS Code setup, adapting to light, dark, and high-contrast themes.

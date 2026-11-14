@@ -11,4 +11,5 @@ export interface ExtensionMessage {
 export interface PackageOperationStatus {
   action: 'install' | 'update' | 'remove';
   packageId: string;
+  packageCount?: number;
 }

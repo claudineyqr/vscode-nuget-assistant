@@ -2,20 +2,37 @@ import * as vscode from 'vscode';
 import { TaskManager } from './task-manager';
 
 type EndTaskHandler = (event: vscode.TaskEndEvent) => void;
+type ProcessEndHandler = (event: { execution: vscode.TaskExecution; exitCode: number | undefined }) => void;
 type Listener = { handler: EndTaskHandler; disposable: vscode.Disposable };
+type ProcessListener = { handler: ProcessEndHandler; disposable: vscode.Disposable };
 
 describe('TaskManager package operation progress', () => {
-  const tasks = vscode.tasks as unknown as { executeTask: jest.Mock; onDidEndTask: jest.Mock };
+  const tasks = vscode.tasks as unknown as {
+    executeTask: jest.Mock;
+    onDidEndTask: jest.Mock;
+    onDidEndTaskProcess?: jest.Mock;
+  };
+  const processEndSubscription = jest.fn();
   let listeners: Listener[];
+  let processListeners: ProcessListener[];
   let executions: Map<vscode.Task, vscode.TaskExecution>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    if (!tasks.onDidEndTaskProcess) {
+      Object.defineProperty(tasks, 'onDidEndTaskProcess', { configurable: true, value: processEndSubscription });
+    }
     listeners = [];
+    processListeners = [];
     executions = new Map();
     tasks.onDidEndTask.mockImplementation((handler: EndTaskHandler) => {
       const disposable = { dispose: jest.fn() };
       listeners.push({ handler, disposable });
+      return disposable;
+    });
+    (tasks.onDidEndTaskProcess as jest.Mock).mockImplementation((handler: ProcessEndHandler) => {
+      const disposable = { dispose: jest.fn() };
+      processListeners.push({ handler, disposable });
       return disposable;
     });
     tasks.executeTask.mockImplementation((task: vscode.Task) => {
@@ -140,6 +157,7 @@ describe('TaskManager package operation progress', () => {
     expect(listeners[0].disposable.dispose).not.toHaveBeenCalled();
 
     finishTask(secondTask);
+    await flushPromises();
 
     expect(finished).not.toHaveBeenCalled();
     expect(listeners[0].disposable.dispose).toHaveBeenCalledTimes(1);
@@ -177,6 +195,7 @@ describe('TaskManager package operation progress', () => {
     const task = { name: 'nuget-assistant' } as vscode.Task;
     const manager = new TaskManager(jest.fn(), jest.fn());
     manager.executeTask(task, { action: 'install', packageId: 'Package1' });
+    await Promise.resolve();
     manager.cancelTasks();
 
     const execution = { task, terminate: jest.fn() } as unknown as vscode.TaskExecution;
@@ -214,6 +233,81 @@ describe('TaskManager package operation progress', () => {
     expect(finished).toHaveBeenCalledTimes(1);
   });
 
+  it('prepares queued tasks only when active and waits for process completion callbacks', async () => {
+    let finishCallback: (() => void) | undefined;
+    let firstExecution: vscode.TaskExecution | undefined;
+    const firstTask = { name: 'nuget-assistant' } as vscode.Task;
+    const secondTask = { name: 'nuget-assistant' } as vscode.Task;
+    const firstCallback = jest.fn((exitCode: number | undefined) => new Promise<void>((resolve) => {
+      expect(exitCode).toBe(1);
+      finishCallback = resolve;
+    }));
+    const firstFactory = jest.fn(async () => ({ task: firstTask, onProcessEnd: firstCallback }));
+    const secondFactory = jest.fn(async () => ({ task: secondTask }));
+    const manager = new TaskManager(jest.fn(), jest.fn());
+
+    manager.executeTask(firstFactory, { action: 'install', packageId: 'Package1' });
+    manager.executeTask(secondFactory, { action: 'install', packageId: 'Package2' });
+    await flushPromises();
+
+    expect(firstFactory).toHaveBeenCalledTimes(1);
+    expect(secondFactory).not.toHaveBeenCalled();
+    firstExecution = executions.get(firstTask);
+    if (!firstExecution) {
+      throw new Error('Task execution was not recorded.');
+    }
+    processListeners.forEach(({ handler }) => handler({ execution: firstExecution as vscode.TaskExecution, exitCode: 1 }));
+    finishTask(firstTask);
+    await flushPromises();
+
+    expect(firstCallback).toHaveBeenCalledWith(1);
+    expect(secondFactory).not.toHaveBeenCalled();
+
+    finishCallback?.();
+    await flushPromises();
+
+    expect(secondFactory).toHaveBeenCalledTimes(1);
+    expect(tasks.executeTask).toHaveBeenLastCalledWith(secondTask);
+  });
+
+  it('runs a retry task before advancing the queue when a completion callback requests one', async () => {
+    const firstTask = { name: 'nuget-assistant' } as vscode.Task;
+    const retryTask = { name: 'nuget-assistant' } as vscode.Task;
+    const nextTask = { name: 'nuget-assistant' } as vscode.Task;
+    const secondAttempt = jest.fn();
+    const firstAttempt = jest.fn(() => ({ task: retryTask, onProcessEnd: secondAttempt }));
+    const manager = new TaskManager(jest.fn(), jest.fn());
+
+    manager.executeTask(async () => ({ task: firstTask, onProcessEnd: firstAttempt }), { action: 'update', packageId: 'Package1' });
+    manager.executeTask(nextTask, { action: 'update', packageId: 'Package2' });
+    await flushPromises();
+    finishTask(firstTask);
+    await flushPromises();
+
+    expect(firstAttempt).toHaveBeenCalledWith(undefined);
+    expect(tasks.executeTask).toHaveBeenLastCalledWith(retryTask);
+    expect(tasks.executeTask).toHaveBeenCalledTimes(2);
+
+    finishTask(retryTask);
+    await flushPromises();
+
+    expect(secondAttempt).toHaveBeenCalledWith(undefined);
+    expect(tasks.executeTask).toHaveBeenLastCalledWith(nextTask);
+  });
+
+  it('passes an undefined exit code to the callback when task startup fails', async () => {
+    const task = { name: 'nuget-assistant' } as vscode.Task;
+    const onProcessEnd = jest.fn();
+    tasks.executeTask.mockRejectedValue(new Error('task could not start'));
+    const manager = new TaskManager(jest.fn(), jest.fn());
+
+    manager.executeTask(async () => ({ task, onProcessEnd }), { action: 'install', packageId: 'Package1' });
+    await flushPromises();
+
+    expect(onProcessEnd).toHaveBeenCalledTimes(1);
+    expect(onProcessEnd).toHaveBeenCalledWith(undefined);
+  });
+
   function finishTask(task: vscode.Task): void {
     const execution = executions.get(task);
     if (!execution) {
@@ -223,7 +317,8 @@ describe('TaskManager package operation progress', () => {
   }
 
   async function flushPromises(): Promise<void> {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 6; i += 1) {
+      await Promise.resolve();
+    }
   }
 });

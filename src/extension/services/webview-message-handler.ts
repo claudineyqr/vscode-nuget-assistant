@@ -7,13 +7,18 @@ import * as vscode from 'vscode';
 import * as http from 'node:http';
 import * as https from 'node:https';
 import * as dns from 'node:dns';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { decodeNuGetResponseBody } from './nuget-response';
 
 import NuGetConfigLoader from './nuget-config-loader';
 import ProjectFileLoader from './project-file-loader';
+import { ProjectFileEditor } from './project-file-editor';
+import { findFailedPackageIds } from './restore-diagnostics';
+import { ExecutionMode } from '../models/execution-mode';
 import SolutionLoader from './solution-loader';
-import { TaskManager } from './task-manager';
+import { TaskManager, type TaskPreparation } from './task-manager';
 import {
   assertHttpCredentialsAllowed,
   isRecord,
@@ -50,6 +55,7 @@ enum LoggingLevel {
 export default class WebviewMessageHandler {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly projectFileLoader: ProjectFileLoader;
+  private readonly projectFileEditor: ProjectFileEditor;
   private readonly solutionLoader: SolutionLoader;
   private readonly nuGetConfigLoader: NuGetConfigLoader;
   private readonly taskManager: TaskManager;
@@ -65,6 +71,7 @@ export default class WebviewMessageHandler {
     private readonly workspaceState: vscode.Memento
   ) {
     this.projectFileLoader = new ProjectFileLoader();
+    this.projectFileEditor = new ProjectFileEditor();
     this.solutionLoader = new SolutionLoader(this.projectFileLoader);
     this.nuGetConfigLoader = new NuGetConfigLoader(process.env, undefined, (message) => this.log(message));
     this.taskManager = new TaskManager(
@@ -156,6 +163,35 @@ export default class WebviewMessageHandler {
       return;
     }
     projectPaths.forEach((projectPath) => {
+      const operation = message.operation ?? 'install';
+      if (this.getPackageExecutionMode() === ExecutionMode.ProjectFile && path.extname(projectPath).toLowerCase() === '.csproj') {
+        this.taskManager.executeTask(() => {
+          const rollback = this.projectFileEditor.apply(projectPath, message.packageId, message.packageVersion);
+          return Promise.resolve({
+            task: this.createTask('restore', ['restore', { value: projectPath, quoting: vscode.ShellQuoting.Strong }]),
+            onProcessEnd: (exitCode) => {
+              if (exitCode !== 0) {
+                let rollbackError: string | undefined;
+                try {
+                  rollback();
+                } catch (error) {
+                  rollbackError = this.getErrorMessage(error);
+                  this.logError(`Rollback failed for ${message.packageId} in ${projectPath}: ${rollbackError}`);
+                }
+                if (exitCode !== undefined) {
+                  vscode.window.showErrorMessage(rollbackError
+                    ? localize('error.restoreRollbackFailed', message.packageId, rollbackError)
+                    : localize('error.restorePackageOperation', message.packageId, this.getRestoreFailureDetails(exitCode)));
+                }
+              }
+            },
+          });
+        }, {
+          action: operation,
+          packageId: message.packageId,
+        });
+        return;
+      }
       const args = [
         'add',
         { value: projectPath, quoting: vscode.ShellQuoting.Strong },
@@ -169,7 +205,7 @@ export default class WebviewMessageHandler {
       ];
 
       this.taskManager.executeTask(this.createTask('add', args), {
-        action: message.operation ?? 'install',
+        action: operation,
         packageId: message.packageId,
       });
     });
@@ -179,11 +215,237 @@ export default class WebviewMessageHandler {
     if (!Array.isArray(message.packages)) {
       return;
     }
+    if (this.getPackageExecutionMode() !== ExecutionMode.ProjectFile) {
+      message.packages.forEach((packageMessage) => {
+        if (isRecord(packageMessage)) {
+          this.addPackage(packageMessage);
+        }
+      });
+      return;
+    }
+
+    const batches = new Map<string, InstallMessage[]>();
     message.packages.forEach((packageMessage) => {
-      if (isRecord(packageMessage)) {
-        this.addPackage(packageMessage);
+      if (!isRecord(packageMessage)) {
+        return;
       }
+      const installMessage = packageMessage as unknown as InstallMessage;
+      const source = this.configuredSources.some((candidate) => candidate.url === installMessage.packageSourceUrl);
+      if (
+        !isValidPackageId(installMessage.packageId) || !isValidPackageVersion(installMessage.packageVersion) ||
+        !source || !parseHttpUrl(installMessage.packageSourceUrl)
+      ) {
+        return;
+      }
+      if (installMessage.operation !== 'update') {
+        this.addPackage(installMessage);
+        return;
+      }
+
+      const projectPaths = this.getValidatedProjectPaths(installMessage);
+      projectPaths.forEach((projectPath) => {
+        if (path.extname(projectPath).toLowerCase() !== '.csproj') {
+          this.addPackage({ ...installMessage, projectPaths: [projectPath] });
+          return;
+        }
+        const updates = batches.get(projectPath) ?? [];
+        updates.push({ ...installMessage, projectPaths: [projectPath] });
+        batches.set(projectPath, updates);
+      });
     });
+
+    batches.forEach((updates, projectPath) => this.addPackageBatch(projectPath, updates));
+  }
+
+  private addPackageBatch(projectPath: string, packages: InstallMessage[]): void {
+    const packageIds = packages.map((packageMessage) => packageMessage.packageId);
+    this.taskManager.executeTask(
+      () => {
+        const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'nuget-assistant-restore-'));
+        let rollback: (() => void) | undefined;
+        try {
+          rollback = this.projectFileEditor.applyMany(projectPath, packages.map(({ packageId, packageVersion }) => ({
+            packageId,
+            version: packageVersion,
+          })));
+          return Promise.resolve(this.createBatchRestorePreparation(
+            projectPath,
+            packages,
+            rollback,
+            logDirectory,
+            1
+          ));
+        } catch (error) {
+          if (rollback) {
+            this.tryRollbackBatch(rollback, packageIds);
+          }
+          this.removeRestoreLogs(logDirectory, []);
+          throw error;
+        }
+      },
+      { action: 'update', packageId: packageIds[0], packageCount: packageIds.length }
+    );
+  }
+
+  private createBatchRestorePreparation(
+    projectPath: string,
+    packages: InstallMessage[],
+    rollback: () => void,
+    logDirectory: string,
+    attempt: number
+  ): TaskPreparation {
+    const packageIds = packages.map((packageMessage) => packageMessage.packageId);
+    const logPath = path.join(logDirectory, `restore-${attempt}.log`);
+    return {
+      task: this.createTask('restore', [
+        'msbuild',
+        { value: projectPath, quoting: vscode.ShellQuoting.Strong },
+        '-t:Restore',
+        { value: `-flp:logfile=${logPath};verbosity=normal;encoding=UTF-8`, quoting: vscode.ShellQuoting.Strong },
+      ]),
+      onProcessEnd: (exitCode): TaskPreparation | void => {
+        if (exitCode === 0) {
+          this.removeRestoreLogs(logDirectory, [logPath]);
+          return;
+        }
+        if (exitCode === undefined) {
+          this.rollbackBatch(rollback, logDirectory, [logPath], packageIds);
+          return;
+        }
+
+        const diagnostics = this.readRestoreDiagnostics(logPath);
+        const failedPackageIds = findFailedPackageIds(diagnostics, packageIds);
+        if (failedPackageIds.length > 0 && failedPackageIds.length < packageIds.length) {
+          if (!this.tryRollbackBatch(rollback, packageIds)) {
+            this.removeRestoreLogs(logDirectory, [logPath]);
+            return;
+          }
+
+          const remainingPackages = packages.filter((packageMessage) => !failedPackageIds.includes(packageMessage.packageId));
+          let retryRollback: (() => void) | undefined;
+          try {
+            retryRollback = this.projectFileEditor.applyMany(projectPath, remainingPackages.map(({ packageId, packageVersion }) => ({
+              packageId,
+              version: packageVersion,
+            })));
+          } catch (error) {
+            this.removeRestoreLogs(logDirectory, [logPath]);
+            vscode.window.showErrorMessage(localize(
+              'error.restoreBatchOperation',
+              packageIds.join(', '),
+              this.getErrorMessage(error)
+            ));
+            return;
+          }
+
+          if (!retryRollback) {
+            this.removeRestoreLogs(logDirectory, [logPath]);
+            vscode.window.showErrorMessage(localize(
+              'error.restoreBatchOperation',
+              packageIds.join(', '),
+              this.getRestoreFailureDetails(exitCode)
+            ));
+            return;
+          }
+
+          const retryLogPath = path.join(logDirectory, `restore-${attempt + 1}.log`);
+          try {
+            return {
+              task: this.createTask('restore', [
+                'msbuild',
+                { value: projectPath, quoting: vscode.ShellQuoting.Strong },
+                '-t:Restore',
+                { value: `-flp:logfile=${retryLogPath};verbosity=normal;encoding=UTF-8`, quoting: vscode.ShellQuoting.Strong },
+              ]),
+              onProcessEnd: (retryExitCode) => {
+                this.removeRestoreLogs(logDirectory, [logPath, retryLogPath]);
+                if (retryExitCode === 0) {
+                  vscode.window.showErrorMessage(localize(
+                    'error.restoreBatchSelectiveRollback',
+                    failedPackageIds.join(', '),
+                    this.getRestoreFailureDetails(exitCode)
+                  ));
+                  return;
+                }
+
+                if (retryExitCode === undefined) {
+                  this.tryRollbackBatch(retryRollback, packageIds);
+                  return;
+                }
+
+                this.reportBatchRollbackFailure(retryRollback, packageIds, retryExitCode);
+              },
+            };
+          } catch (error) {
+            this.logHandledError(`Could not prepare the restore retry for ${projectPath}: ${this.getErrorMessage(error)}`, error);
+            this.reportBatchRollbackFailure(retryRollback, packageIds, exitCode, logDirectory, [logPath, retryLogPath]);
+            return;
+          }
+        }
+        this.reportBatchRollbackFailure(rollback, packageIds, exitCode, logDirectory, [logPath]);
+      },
+    };
+  }
+
+  private readRestoreDiagnostics(logPath: string): string {
+    try {
+      return fs.readFileSync(logPath, 'utf8');
+    } catch (error) {
+      this.logError(`Could not read the restore diagnostics: ${this.getErrorMessage(error)}`);
+      return '';
+    }
+  }
+
+  private tryRollbackBatch(rollback: () => void, packageIds: string[]): boolean {
+    try {
+      rollback();
+      return true;
+    } catch (error) {
+      const details = this.getErrorMessage(error);
+      this.logError(`Rollback failed for ${packageIds.join(', ')}: ${details}`);
+      vscode.window.showErrorMessage(localize('error.restoreBatchRollbackFailed', packageIds.join(', '), details));
+      return false;
+    }
+  }
+
+  private rollbackBatch(rollback: () => void, logDirectory: string, logPaths: string[], packageIds: string[]): void {
+    this.tryRollbackBatch(rollback, packageIds);
+    this.removeRestoreLogs(logDirectory, logPaths);
+  }
+
+  private reportBatchRollbackFailure(
+    rollback: () => void,
+    packageIds: string[],
+    exitCode: number,
+    logDirectory?: string,
+    logPaths: string[] = []
+  ): void {
+    const rolledBack = this.tryRollbackBatch(rollback, packageIds);
+    if (rolledBack) {
+      vscode.window.showErrorMessage(localize(
+        'error.restoreBatchOperation',
+        packageIds.join(', '),
+        this.getRestoreFailureDetails(exitCode)
+      ));
+    }
+    if (logDirectory) {
+      this.removeRestoreLogs(logDirectory, logPaths);
+    }
+  }
+
+  private removeRestoreLogs(logDirectory: string, logPaths: string[]): void {
+    for (const logPath of logPaths) {
+      try {
+        fs.rmSync(logPath, { force: true });
+      } catch (error) {
+        this.logError(`Could not remove restore log ${logPath}: ${this.getErrorMessage(error)}`);
+      }
+    }
+    try {
+      fs.rmdirSync(logDirectory);
+    } catch {
+      // The directory can remain temporarily while a retry log is still present.
+    }
   }
 
   private removePackage(message: UninstallMessage): void {
@@ -195,6 +457,31 @@ export default class WebviewMessageHandler {
       return;
     }
     projectPaths.forEach((projectPath) => {
+      if (this.getPackageExecutionMode() === ExecutionMode.ProjectFile && path.extname(projectPath).toLowerCase() === '.csproj') {
+        this.taskManager.executeTask(() => {
+          const rollback = this.projectFileEditor.apply(projectPath, message.packageId, undefined);
+          return Promise.resolve({
+            task: this.createTask('restore', ['restore', { value: projectPath, quoting: vscode.ShellQuoting.Strong }]),
+            onProcessEnd: (exitCode) => {
+              if (exitCode !== 0) {
+                let rollbackError: string | undefined;
+                try {
+                  rollback();
+                } catch (error) {
+                  rollbackError = this.getErrorMessage(error);
+                  this.logError(`Rollback failed for ${message.packageId} in ${projectPath}: ${rollbackError}`);
+                }
+                if (exitCode !== undefined) {
+                  vscode.window.showErrorMessage(rollbackError
+                    ? localize('error.restoreRollbackFailed', message.packageId, rollbackError)
+                    : localize('error.restorePackageOperation', message.packageId, this.getRestoreFailureDetails(exitCode)));
+                }
+              }
+            },
+          });
+        }, { action: 'remove', packageId: message.packageId });
+        return;
+      }
       const args = [
         'remove',
         { value: projectPath, quoting: vscode.ShellQuoting.Strong },
@@ -235,10 +522,23 @@ export default class WebviewMessageHandler {
       new vscode.ShellExecution('dotnet', args)
     );
     task.presentationOptions = {
-      reveal: vscode.TaskRevealKind.Always,
+      reveal: vscode.workspace.getConfiguration('nuget-assistant').get<boolean>('showTaskWindow', false)
+        ? vscode.TaskRevealKind.Always
+        : vscode.TaskRevealKind.Silent,
       focus: false,
     };
     return task;
+  }
+
+  private getPackageExecutionMode(): ExecutionMode {
+    const configuredMode = vscode.workspace.getConfiguration('nuget-assistant').get<unknown>('packageExecutionMode', ExecutionMode.Dotnet);
+    return Object.values(ExecutionMode).includes(configuredMode as ExecutionMode)
+      ? configuredMode as ExecutionMode
+      : ExecutionMode.Dotnet;
+  }
+
+  private getRestoreFailureDetails(exitCode: number): string {
+    return localize('error.restoreExitCode', exitCode);
   }
 
   private async loadProject(): Promise<void> {

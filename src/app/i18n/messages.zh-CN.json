@@ -11,6 +11,7 @@
     "operation.cancelButtonAriaLabel": "取消操作",
     "operation.uninstalling": "正在卸载",
     "operation.updating": "正在更新",
+    "operation.updatingPackages": "正在更新 {$INTERPOLATION} 个包...",
     "package.deprecatedLabel": "已弃用的包",
     "package.icon.alt": "{$INTERPOLATION} 图标",
     "package.verified.tooltip": "当前选定源已为该包的所有者保留此包的 ID 前缀。",

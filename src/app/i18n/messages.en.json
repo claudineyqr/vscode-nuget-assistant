@@ -6,6 +6,7 @@
     "operation.cancelButtonAriaLabel": "Cancel operation",
     "operation.uninstalling": "Uninstalling",
     "operation.updating": "Updating",
+    "operation.updatingPackages": "Updating {$INTERPOLATION} packages...",
     "operation.installing": "Installing",
     "loading.accessibleLabel": "Loading",
     "navigation.main.accessibleLabel": "main navigation",

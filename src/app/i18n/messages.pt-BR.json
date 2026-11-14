@@ -11,6 +11,7 @@
     "operation.cancelButtonAriaLabel": "Cancelar operação",
     "operation.uninstalling": "Desinstalando",
     "operation.updating": "Atualizando",
+    "operation.updatingPackages": "Atualizando {$INTERPOLATION} pacotes...",
     "package.deprecatedLabel": "Pacote descontinuado",
     "package.icon.alt": "ícone de {$INTERPOLATION}",
     "package.verified.tooltip": "O prefixo do ID deste pacote foi reservado para o proprietário do pacote pelo feed atualmente selecionado.",

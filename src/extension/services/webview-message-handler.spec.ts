@@ -1,8 +1,10 @@
 import WebviewMessageHandler from './webview-message-handler';
 import * as vscode from 'vscode';
 import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import * as path from 'node:path';
+import { ExecutionMode } from '../models/execution-mode';
 
 describe('WebviewMessageHandler NuGet request cancellation', () => {
   it('destroys every active connection when the selected source changes', () => {
@@ -132,6 +134,7 @@ describe('WebviewMessageHandler batched package operations', () => {
       projectFilePath,
       solutionLoader: { readProjectPaths: jest.fn() },
       taskManager,
+      getPackageExecutionMode: jest.fn(() => ExecutionMode.Dotnet),
       createTask: jest.fn((command: string, args: unknown[]) => ({ command, args })),
     }) as { handleMessage(message: unknown): void };
 
@@ -174,6 +177,310 @@ describe('WebviewMessageHandler batched package operations', () => {
     handler.handleMessage({ command: 'add-packages', packages: null });
 
     expect(taskManager.executeTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('WebviewMessageHandler project-file package operations', () => {
+  const projectPath = path.resolve('workspace', 'demo.csproj');
+  const shellQuotingDescriptor = Object.getOwnPropertyDescriptor(vscode, 'ShellQuoting');
+  const getConfigurationDescriptor = Object.getOwnPropertyDescriptor(vscode.workspace, 'getConfiguration');
+
+  beforeAll(() => {
+    Object.defineProperty(vscode, 'ShellQuoting', { configurable: true, value: { Strong: 1 } });
+    Object.defineProperty(vscode.workspace, 'getConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ get: (_key: string, defaultValue: unknown) => defaultValue })),
+    });
+  });
+
+  afterAll(() => {
+    if (shellQuotingDescriptor) {
+      Object.defineProperty(vscode, 'ShellQuoting', shellQuotingDescriptor);
+    } else {
+      delete (vscode as unknown as Record<string, unknown>)['ShellQuoting'];
+    }
+    if (getConfigurationDescriptor) {
+      Object.defineProperty(vscode.workspace, 'getConfiguration', getConfigurationDescriptor);
+    } else {
+      delete (vscode.workspace as unknown as Record<string, unknown>)['getConfiguration'];
+    }
+  });
+
+  const makeHandler = (mode: ExecutionMode, targetPath = projectPath) => {
+    const rollback = jest.fn();
+    const editorApply = jest.fn(() => rollback);
+    const editorApplyMany = jest.fn(() => rollback);
+    const taskManager = { executeTask: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), {
+      configuredSources: [{ name: 'test', url: 'https://packages.example/v3/index.json' }],
+      projectFilePath: targetPath,
+      solutionLoader: { readProjectPaths: jest.fn() },
+      projectFileEditor: { apply: editorApply, applyMany: editorApplyMany },
+      taskManager,
+      getValidatedProjectPaths: jest.fn(() => [targetPath]),
+      getPackageExecutionMode: jest.fn(() => mode),
+      createTask: jest.fn((command: string, args: unknown[]) => ({ command, args })),
+      logError: jest.fn(),
+      getErrorMessage: jest.fn((error: unknown) => error instanceof Error ? error.message : String(error)),
+    }) as {
+      addPackage(message: unknown): void;
+      handleMessage(message: unknown): void;
+      removePackage(message: unknown): void;
+      projectFileEditor: { apply: jest.Mock; applyMany: jest.Mock };
+      taskManager: { executeTask: jest.Mock };
+      createTask: jest.Mock;
+      logError: jest.Mock;
+      getErrorMessage: jest.Mock;
+    };
+    return { handler, rollback, editorApply, editorApplyMany, taskManager };
+  };
+
+  const addMessage = {
+    packageId: 'Contoso.Widget',
+    packageVersion: '2.1.0',
+    packageSourceUrl: 'https://packages.example/v3/index.json',
+    projectName: projectPath,
+  };
+
+  it('edits the project and schedules restore for installation in project-file mode', async () => {
+    const { handler, editorApply, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+
+    handler.addPackage(addMessage);
+    const [prepare, operation] = taskManager.executeTask.mock.calls[0] as [() => Promise<{ task: unknown; onProcessEnd: (code: number | undefined) => void }>, unknown];
+    const prepared = await prepare();
+    prepared.onProcessEnd(0);
+
+    expect(editorApply).toHaveBeenCalledWith(projectPath, 'Contoso.Widget', '2.1.0');
+    expect(handler.createTask).toHaveBeenCalledWith('restore', expect.any(Array));
+    expect(operation).toEqual({ action: 'install', packageId: 'Contoso.Widget' });
+  });
+
+  it('batches selected project-file updates and selectively rolls back only diagnosed packages', async () => {
+    const { handler, rollback, editorApplyMany, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+    const errorDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'showErrorMessage');
+    const showErrorMessage = jest.fn();
+    Object.defineProperty(vscode.window, 'showErrorMessage', { configurable: true, value: showErrorMessage });
+
+    try {
+      handler.handleMessage({
+        command: 'add-packages',
+        packages: ['Contoso.Widget', 'Fabrikam.Utility'].map((packageId) => ({
+          ...addMessage,
+          packageId,
+          packageVersion: '2.1.0',
+          packageSourceUrl: 'https://packages.example/v3/index.json',
+          operation: 'update',
+        })),
+      });
+
+      expect(taskManager.executeTask).toHaveBeenCalledTimes(1);
+      expect(taskManager.executeTask.mock.calls[0][1]).toEqual({
+        action: 'update',
+        packageId: 'Contoso.Widget',
+        packageCount: 2,
+      });
+      const prepare = taskManager.executeTask.mock.calls[0][0] as () => Promise<{
+        task: { args: Array<string | { value: string }> };
+        onProcessEnd: (exitCode: number | undefined) => Promise<unknown>;
+      }>;
+      const firstAttempt = await prepare();
+      const firstLogArgument = firstAttempt.task.args.find((arg) => typeof arg !== 'string' && arg.value.startsWith('-flp:'));
+      if (!firstLogArgument || typeof firstLogArgument === 'string') {
+        throw new Error('Restore file logger argument was not created.');
+      }
+      const firstLogPath = firstLogArgument.value.slice('-flp:logfile='.length).split(';')[0];
+      fs.writeFileSync(firstLogPath, 'Demo.csproj : error NU1101: Unable to find package Contoso.Widget.');
+
+      const retry = await firstAttempt.onProcessEnd(1) as {
+        task: { args: Array<string | { value: string }> };
+        onProcessEnd: (exitCode: number | undefined) => void;
+      };
+      expect(retry).toBeDefined();
+      expect(rollback).toHaveBeenCalledTimes(1);
+      expect(editorApplyMany).toHaveBeenNthCalledWith(2, projectPath, [
+        { packageId: 'Fabrikam.Utility', version: '2.1.0' },
+      ]);
+
+      const retryLogArgument = retry.task.args.find((arg) => typeof arg !== 'string' && arg.value.startsWith('-flp:'));
+      if (!retryLogArgument || typeof retryLogArgument === 'string') {
+        throw new Error('Retry restore file logger argument was not created.');
+      }
+      fs.writeFileSync(retryLogArgument.value.slice('-flp:logfile='.length).split(';')[0], '');
+      retry.onProcessEnd(0);
+
+      expect(showErrorMessage).toHaveBeenCalledWith(expect.stringContaining('Contoso.Widget'));
+      expect(showErrorMessage).toHaveBeenCalledWith(expect.stringContaining('other selected updates were restored'));
+    } finally {
+      if (errorDescriptor) {
+        Object.defineProperty(vscode.window, 'showErrorMessage', errorDescriptor);
+      } else {
+        delete (vscode.window as unknown as Record<string, unknown>)['showErrorMessage'];
+      }
+    }
+  });
+
+  it('rolls the complete batch back when a selective retry also fails', async () => {
+    const { handler, rollback, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+    const errorDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'showErrorMessage');
+    const showErrorMessage = jest.fn();
+    Object.defineProperty(vscode.window, 'showErrorMessage', { configurable: true, value: showErrorMessage });
+
+    try {
+      handler.handleMessage({
+        command: 'add-packages',
+        packages: ['Contoso.Widget', 'Fabrikam.Utility'].map((packageId) => ({
+          ...addMessage,
+          packageId,
+          packageVersion: '2.1.0',
+          packageSourceUrl: 'https://packages.example/v3/index.json',
+          operation: 'update',
+        })),
+      });
+
+      const prepare = taskManager.executeTask.mock.calls[0][0] as () => Promise<{
+        task: { args: Array<string | { value: string }> };
+        onProcessEnd: (exitCode: number | undefined) => Promise<unknown>;
+      }>;
+      const firstAttempt = await prepare();
+      const firstLogArgument = firstAttempt.task.args.find((arg) => typeof arg !== 'string' && arg.value.startsWith('-flp:'));
+      if (!firstLogArgument || typeof firstLogArgument === 'string') {
+        throw new Error('Restore file logger argument was not created.');
+      }
+      fs.writeFileSync(
+        firstLogArgument.value.slice('-flp:logfile='.length).split(';')[0],
+        'Demo.csproj : error NU1101: Unable to find package Contoso.Widget.'
+      );
+
+      const retry = await firstAttempt.onProcessEnd(1) as {
+        task: { args: Array<string | { value: string }> };
+        onProcessEnd: (exitCode: number | undefined) => void;
+      };
+      const retryLogArgument = retry.task.args.find((arg) => typeof arg !== 'string' && arg.value.startsWith('-flp:'));
+      if (!retryLogArgument || typeof retryLogArgument === 'string') {
+        throw new Error('Retry restore file logger argument was not created.');
+      }
+      fs.writeFileSync(retryLogArgument.value.slice('-flp:logfile='.length).split(';')[0], 'error NU1301: Source unavailable.');
+      retry.onProcessEnd(1);
+
+      expect(rollback).toHaveBeenCalledTimes(2);
+      expect(showErrorMessage).toHaveBeenCalledWith(expect.stringContaining('all project file changes were rolled back'));
+    } finally {
+      if (errorDescriptor) {
+        Object.defineProperty(vscode.window, 'showErrorMessage', errorDescriptor);
+      } else {
+        delete (vscode.window as unknown as Record<string, unknown>)['showErrorMessage'];
+      }
+    }
+  });
+
+  it('rolls back an installation when restore fails and reports the error', async () => {
+    const { handler, rollback, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+    const errorDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'showErrorMessage');
+    const showErrorMessage = jest.fn();
+    Object.defineProperty(vscode.window, 'showErrorMessage', { configurable: true, value: showErrorMessage });
+
+    try {
+      handler.addPackage(addMessage);
+      const [prepare] = taskManager.executeTask.mock.calls[0] as [() => Promise<{ task: unknown; onProcessEnd: (code: number | undefined) => void }>];
+      const prepared = await prepare();
+      prepared.onProcessEnd(1);
+
+      expect(rollback).toHaveBeenCalledTimes(1);
+      expect(showErrorMessage).toHaveBeenCalledTimes(1);
+    } finally {
+      if (errorDescriptor) {
+        Object.defineProperty(vscode.window, 'showErrorMessage', errorDescriptor);
+      } else {
+        delete (vscode.window as unknown as Record<string, unknown>)['showErrorMessage'];
+      }
+    }
+  });
+
+  it('logs rollback failures and still reports the restore failure', async () => {
+    const { handler, rollback, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+    const rollbackError = new Error('rollback failed');
+    rollback.mockImplementation(() => { throw rollbackError; });
+    const errorDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'showErrorMessage');
+    const showErrorMessage = jest.fn();
+    Object.defineProperty(vscode.window, 'showErrorMessage', { configurable: true, value: showErrorMessage });
+
+    try {
+      handler.addPackage(addMessage);
+      const [prepare] = taskManager.executeTask.mock.calls[0] as [() => Promise<{ task: unknown; onProcessEnd: (code: number | undefined) => void }>];
+      const prepared = await prepare();
+      prepared.onProcessEnd(1);
+
+      expect(handler.getErrorMessage).toHaveBeenCalledWith(rollbackError);
+      expect(handler.logError).toHaveBeenCalledWith(expect.stringContaining('rollback failed'));
+      expect(showErrorMessage).toHaveBeenCalledTimes(1);
+    } finally {
+      if (errorDescriptor) {
+        Object.defineProperty(vscode.window, 'showErrorMessage', errorDescriptor);
+      } else {
+        delete (vscode.window as unknown as Record<string, unknown>)['showErrorMessage'];
+      }
+    }
+  });
+
+  it('rolls back a cancelled removal without showing a restore error', async () => {
+    const { handler, rollback, editorApply, taskManager } = makeHandler(ExecutionMode.ProjectFile);
+    const errorDescriptor = Object.getOwnPropertyDescriptor(vscode.window, 'showErrorMessage');
+    const showErrorMessage = jest.fn();
+    Object.defineProperty(vscode.window, 'showErrorMessage', { configurable: true, value: showErrorMessage });
+
+    try {
+      handler.removePackage({ packageId: 'Contoso.Widget', projectName: projectPath });
+      const [prepare, operation] = taskManager.executeTask.mock.calls[0] as [() => Promise<{ task: unknown; onProcessEnd: (code: number | undefined) => void }>, unknown];
+      const prepared = await prepare();
+      prepared.onProcessEnd(undefined);
+
+      expect(editorApply).toHaveBeenCalledWith(projectPath, 'Contoso.Widget', undefined);
+      expect(operation).toEqual({ action: 'remove', packageId: 'Contoso.Widget' });
+      expect(rollback).toHaveBeenCalledTimes(1);
+      expect(showErrorMessage).not.toHaveBeenCalled();
+    } finally {
+      if (errorDescriptor) {
+        Object.defineProperty(vscode.window, 'showErrorMessage', errorDescriptor);
+      } else {
+        delete (vscode.window as unknown as Record<string, unknown>)['showErrorMessage'];
+      }
+    }
+  });
+
+  it('keeps using dotnet commands when project-file mode is not selected', () => {
+    const { handler, taskManager } = makeHandler(ExecutionMode.Dotnet);
+
+    handler.addPackage(addMessage);
+
+    const args = handler.createTask.mock.calls[0][1] as Array<string | { value: string }>;
+    expect(args.map((arg) => typeof arg === 'string' ? arg : arg.value)).toEqual(expect.arrayContaining(['add', 'package', 'Contoso.Widget']));
+    expect(taskManager.executeTask.mock.calls[0][1]).toEqual({ action: 'install', packageId: 'Contoso.Widget' });
+  });
+
+  it('uses dotnet when project-file mode targets a non-csproj file', () => {
+    const vbProjectPath = path.resolve('workspace', 'demo.vbproj');
+    const { handler } = makeHandler(ExecutionMode.ProjectFile, vbProjectPath);
+
+    handler.addPackage({ ...addMessage, projectName: vbProjectPath });
+
+    expect(handler.createTask).toHaveBeenCalledWith('add', expect.any(Array));
+  });
+
+  it('falls back to dotnet for an invalid configured execution mode', () => {
+    const getConfigurationDescriptor = Object.getOwnPropertyDescriptor(vscode.workspace, 'getConfiguration');
+    Object.defineProperty(vscode.workspace, 'getConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ get: () => 'invalid-mode' })),
+    });
+    const handler = Object.create(WebviewMessageHandler.prototype) as { getPackageExecutionMode(): ExecutionMode };
+
+    try {
+      expect(handler.getPackageExecutionMode()).toBe(ExecutionMode.Dotnet);
+    } finally {
+      if (getConfigurationDescriptor) {
+        Object.defineProperty(vscode.workspace, 'getConfiguration', getConfigurationDescriptor);
+      }
+    }
   });
 });
 

@@ -123,6 +123,39 @@ describe('PackageRowComponent warning indicator', () => {
     expect(fixture.nativeElement.textContent).toContain('2.0.0');
   });
 
+  it('shows an accessible check badge on the package icon when installed', () => {
+    fixture.componentInstance.package = createPackageRow({ isInstalled: true, isOutdated: false });
+    fixture.detectChanges();
+
+    const statusIcon = fixture.nativeElement.querySelector('svg.installed-status-icon') as SVGElement | null;
+    expect(statusIcon).not.toBeNull();
+    expect(statusIcon?.getAttribute('aria-label')).toBe('Installed');
+    expect(statusIcon?.querySelector('path')?.getAttribute('d')).toBe('m6.5 12.5 3.5 3.5 7.5-8');
+  });
+
+  it('shows an update arrow and accessible update label on an outdated installed package', () => {
+    fixture.componentInstance.package = createPackageRow({ isInstalled: true, isOutdated: true });
+    fixture.detectChanges();
+
+    const statusIcon = fixture.nativeElement.querySelector('svg.installed-status-icon') as SVGElement | null;
+    expect(statusIcon?.getAttribute('aria-label')).toBe('Installed, update available');
+    expect(statusIcon?.querySelector('path')?.getAttribute('d')).toBe('M12 17V7m0 0L7.5 11.5M12 7l4.5 4.5');
+  });
+
+  it('does not show an installed badge when the package is not installed', () => {
+    fixture.componentInstance.package = createPackageRow({ isInstalled: false });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('svg.installed-status-icon')).toBeNull();
+  });
+
+  it('shows the package source name when provided', () => {
+    fixture.componentInstance.package = createPackageRow({ sourceName: 'Private feed' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Private feed');
+  });
+
   it('uses installed-version metadata for the displayed version when it is also the latest', () => {
     fixture.componentInstance.package = createPackageRow({
       version: '1.0.0',

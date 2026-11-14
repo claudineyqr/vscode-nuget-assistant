@@ -67,6 +67,11 @@ export class PackageManagerService {
     return this._currentSelectedPackageId.asObservable();
   }
 
+  private readonly _currentSelectedPackageSourceUrl = new BehaviorSubject<string | null>(null);
+  public get currentSelectedPackageSourceUrl(): Observable<string | null> {
+    return this._currentSelectedPackageSourceUrl.asObservable();
+  }
+
   private readonly _currentPackageOperation = new BehaviorSubject<PackageOperationStatus | null>(null);
   public get currentPackageOperation(): Observable<PackageOperationStatus | null> {
     return this._currentPackageOperation.asObservable();
@@ -95,6 +100,7 @@ export class PackageManagerService {
     this.cancelOngoingRequests();
     this._currentSelectedPackage.next(null);
     this._currentSelectedPackageId.next(null);
+    this._currentSelectedPackageSourceUrl.next(null);
     if (!preserveCurrentPackages) {
       this._currentPackages.next(null);
     }
@@ -186,6 +192,7 @@ export class PackageManagerService {
     this.activeSelectedPackageSubscription?.unsubscribe();
     this.activeSelectedPackageSubscription = undefined;
     this._currentSelectedPackageId.next(selectedPackage?.id ?? null);
+    this._currentSelectedPackageSourceUrl.next(selectedPackage?.sourceUrl ?? null);
     this._currentSelectedPackage.next(null);
 
     if (selectedPackage == null || selectedPackage.versions !== undefined) {
@@ -204,7 +211,10 @@ export class PackageManagerService {
         : this.nugetService.searchByPackageIds([selectedPackage.id], '', this._currentPrerelease, source);
       this.activeSelectedPackageSubscription = detailsRequest.subscribe({
         next: (results) => {
-          if (this._currentSelectedPackageId.value !== selectedPackage.id) {
+          if (
+            this._currentSelectedPackageId.value !== selectedPackage.id ||
+            this._currentSelectedPackageSourceUrl.value !== selectedPackage.sourceUrl
+          ) {
             return;
           }
 
@@ -212,8 +222,12 @@ export class PackageManagerService {
           this._currentSelectedPackage.next(selectedPackage);
         },
         error: () => {
-          if (this._currentSelectedPackageId.value === selectedPackage.id) {
+          if (
+            this._currentSelectedPackageId.value === selectedPackage.id &&
+            this._currentSelectedPackageSourceUrl.value === selectedPackage.sourceUrl
+          ) {
             this._currentSelectedPackageId.next(null);
+            this._currentSelectedPackageSourceUrl.next(null);
           }
         },
       });

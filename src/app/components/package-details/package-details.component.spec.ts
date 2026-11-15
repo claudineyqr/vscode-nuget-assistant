@@ -9,6 +9,42 @@ import { PackageManagerService } from '../../services/package-manager.service';
 import { PackageDetailsComponent } from './package-details.component';
 
 describe('PackageDetailsComponent', () => {
+  it('installs the chosen version and uses update for an installed package', () => {
+    const packageManagerMock = { installPackage: jest.fn(), uninstallPackage: jest.fn() };
+    const component = new PackageDetailsComponent(packageManagerMock as unknown as PackageManagerService, 'en-US');
+    const version = createVersion('2.0.0');
+    component.package = {
+      id: 'Example.Package', version: '2.0.0', description: '', authors: '', iconUrl: '', verified: false,
+      installedVersion: '', isInstalled: false, isOutdated: false, sourceUrl: '', versions: [version],
+    };
+    component.selectedVersion.setValue(version);
+
+    component.install();
+
+    expect(packageManagerMock.installPackage).toHaveBeenCalledWith(component.package, '2.0.0', 'install');
+
+    component.package.isInstalled = true;
+    component.install();
+
+    expect(packageManagerMock.installPackage).toHaveBeenLastCalledWith(component.package, '2.0.0', 'update');
+  });
+
+  it('uninstalls the selected package and formats valid dates while hiding invalid dates', () => {
+    const packageManagerMock = { installPackage: jest.fn(), uninstallPackage: jest.fn() };
+    const component = new PackageDetailsComponent(packageManagerMock as unknown as PackageManagerService, 'en-US');
+    const selectedPackage = {
+      id: 'Example.Package', version: '1.0.0', description: '', authors: '', iconUrl: '', verified: false,
+      installedVersion: '1.0.0', isInstalled: true, isOutdated: false, sourceUrl: '',
+    } as PackageRowModel;
+    component.package = selectedPackage;
+
+    component.uninstall();
+
+    expect(packageManagerMock.uninstallPackage).toHaveBeenCalledWith(selectedPackage);
+    expect(component.formatNumericDate('not a date')).toBe('');
+    expect(component.formatNumericDate('2024-01-02T00:00:00.000Z')).not.toBe('');
+  });
+
   it('exposes the selected catalog version to the template', () => {
     const component = new PackageDetailsComponent({} as PackageManagerService, 'en-US');
     const version = { version: '1.2.3' };

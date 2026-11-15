@@ -157,6 +157,14 @@ describe('AppComponent', () => {
     expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
   });
 
+  test.each([
+    ['install', 'Installing'],
+    ['update', 'Updating'],
+    ['remove', 'Uninstalling'],
+  ] as const)('provides the %s operation label', (action, label) => {
+    expect(component.getOperationLabel(action)).toBe(label);
+  });
+
   test('tracks package operation progress and clears it on completion', () => {
     const operation = { action: 'update' as const, packageId: 'Contoso.Widget' };
     window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {

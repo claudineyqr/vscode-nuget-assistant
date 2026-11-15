@@ -56,4 +56,24 @@ describe('quick-pick', () => {
     expect(vscode.workspace.findFiles).toHaveBeenCalledWith('**/*.{sln,slnx}', undefined, 32);
     expect(selectedSolution).toBe(solutionFile);
   });
+
+  it('warns when the workspace has no solution files', async () => {
+    (vscode.workspace.findFiles as jest.Mock).mockResolvedValue([]);
+
+    await expect(quickPick.pickSolutionFile()).resolves.toBeUndefined();
+
+    expect(vscode.workspace.findFiles).toHaveBeenCalledWith('**/*.{sln,slnx}', undefined, 32);
+    expect(vscode.window.showWarningMessage).toHaveBeenCalled();
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+
+  it('warns when the user cancels solution selection', async () => {
+    const solutionFile = vscode.Uri.file('/path/to/sample.sln');
+    (vscode.workspace.findFiles as jest.Mock).mockResolvedValue([solutionFile]);
+    (vscode.window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+
+    await expect(quickPick.pickSolutionFile()).resolves.toBeUndefined();
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalled();
+  });
 });

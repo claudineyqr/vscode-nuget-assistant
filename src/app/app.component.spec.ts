@@ -86,6 +86,15 @@ describe('AppComponent', () => {
     expect(packageManagerMock.changeCurrentSources.mock.calls[0][0]).toEqual(event.data.data);
   });
 
+  test('forwards the selected package source URL with the source list', () => {
+    const sources: PackageSource[] = [{ name: 'Private', url: 'https://packages.example/v3/index.json', authorizationHeader: undefined }];
+    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
+      data: { type: 'sources', data: sources, selectedSourceUrl: sources[0].url },
+    }));
+
+    expect(packageManagerMock.changeCurrentSources).toHaveBeenCalledWith(sources, sources[0].url);
+  });
+
   test('should refresh current packages when the extension reports completed package operations', () => {
     const event = new MessageEvent<ExtensionMessage>('message', {
       data: { type: 'packages-changed' },
@@ -146,5 +155,26 @@ describe('AppComponent', () => {
     component.cancelPackageOperation();
 
     expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['install', 'Installing'],
+    ['update', 'Updating'],
+    ['remove', 'Uninstalling'],
+  ] as const)('provides the %s operation label', (action, label) => {
+    expect(component.getOperationLabel(action)).toBe(label);
+  });
+
+  test('tracks package operation progress and clears it on completion', () => {
+    const operation = { action: 'update' as const, packageId: 'Contoso.Widget' };
+    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
+      data: { type: 'package-operation-progress', operation },
+    }));
+    expect(packageManagerMock.changeCurrentPackageOperation).toHaveBeenCalledWith(operation);
+
+    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
+      data: { type: 'package-operation-complete' },
+    }));
+    expect(packageManagerMock.changeCurrentPackageOperation).toHaveBeenLastCalledWith(null);
   });
 });

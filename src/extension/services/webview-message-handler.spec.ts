@@ -1,9 +1,21 @@
+jest.mock('node:dns', () => {
+  const actual = jest.requireActual('node:dns');
+  return { ...actual, promises: { ...actual.promises, lookup: jest.fn() } };
+});
+jest.mock('node:http', () => ({ ...jest.requireActual('node:http'), request: jest.fn() }));
+jest.mock('node:https', () => ({ ...jest.requireActual('node:https'), request: jest.fn() }));
+
 import WebviewMessageHandler from './webview-message-handler';
 import * as vscode from 'vscode';
 import { EventEmitter } from 'node:events';
+import * as dns from 'node:dns';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as https from 'node:https';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import * as path from 'node:path';
+import NuGetConfigLoader from './nuget-config-loader';
+import ProjectFileLoader from './project-file-loader';
 import { ExecutionMode } from '../models/execution-mode';
 
 describe('WebviewMessageHandler NuGet request cancellation', () => {
@@ -177,6 +189,19 @@ describe('WebviewMessageHandler batched package operations', () => {
     handler.handleMessage({ command: 'add-packages', packages: null });
 
     expect(taskManager.executeTask).not.toHaveBeenCalled();
+  });
+
+  it('ignores malformed messages and unknown commands', () => {
+    const taskManager = { executeTask: jest.fn(), cancelTasks: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), { taskManager }) as {
+      handleMessage(message: unknown): void;
+    };
+
+    expect(() => handler.handleMessage(null)).not.toThrow();
+    expect(() => handler.handleMessage({ command: 42 })).not.toThrow();
+    expect(() => handler.handleMessage({ command: 'unrecognized' })).not.toThrow();
+    expect(taskManager.executeTask).not.toHaveBeenCalled();
+    expect(taskManager.cancelTasks).not.toHaveBeenCalled();
   });
 });
 
@@ -457,6 +482,32 @@ describe('WebviewMessageHandler project-file package operations', () => {
     expect(taskManager.executeTask.mock.calls[0][1]).toEqual({ action: 'install', packageId: 'Contoso.Widget' });
   });
 
+  it('routes a removal message to dotnet with the selected package and project', () => {
+    const { handler, taskManager } = makeHandler(ExecutionMode.Dotnet);
+
+    handler.handleMessage({ command: 'remove-package', packageId: 'Contoso.Widget', projectName: projectPath });
+
+    expect(handler.createTask).toHaveBeenCalledWith('remove', expect.arrayContaining([
+      'remove', expect.objectContaining({ value: projectPath }), 'package', expect.objectContaining({ value: 'Contoso.Widget' }),
+    ]));
+    expect(taskManager.executeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      { action: 'remove', packageId: 'Contoso.Widget' }
+    );
+  });
+
+  it.each([
+    ['invalid package identifier', { ...addMessage, packageId: '../Contoso.Widget' }],
+    ['unconfigured source', { ...addMessage, packageSourceUrl: 'https://other.example/v3/index.json' }],
+    ['invalid package version', { ...addMessage, packageVersion: 'not a version' }],
+  ])('does not schedule an add for %s', (_caseName, message) => {
+    const { handler, taskManager } = makeHandler(ExecutionMode.Dotnet);
+
+    handler.handleMessage({ command: 'add-package', ...message });
+
+    expect(taskManager.executeTask).not.toHaveBeenCalled();
+  });
+
   it('uses dotnet when project-file mode targets a non-csproj file', () => {
     const vbProjectPath = path.resolve('workspace', 'demo.vbproj');
     const { handler } = makeHandler(ExecutionMode.ProjectFile, vbProjectPath);
@@ -496,6 +547,245 @@ describe('WebviewMessageHandler disposal', () => {
     handler.dispose();
 
     expect(taskManager.dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('WebviewMessageHandler package source configuration', () => {
+  const sourceUrl = 'https://packages.example/v3/index.json';
+  const makeHandler = (sources: unknown[], preferredSource: unknown) => {
+    const webview = { postMessage: jest.fn() };
+    const workspaceState = { get: jest.fn(() => preferredSource), update: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), {
+      projectFilePath: path.resolve('workspace', 'demo.csproj'),
+      configuredSources: [],
+      nuGetConfigLoader: { loadAsync: jest.fn().mockResolvedValue(sources) },
+      workspaceState,
+      webview,
+      log: jest.fn(),
+      logHandledError: jest.fn(),
+      getErrorMessage: jest.fn((error: unknown) => error instanceof Error ? error.message : String(error)),
+    }) as {
+      loadConfiguration(): void;
+      saveSelectedSource(sourceUrl: unknown): Promise<void>;
+      configuredSources: Array<{ name: string; url: string; authorizationHeader?: string }>;
+      nuGetConfigLoader: { loadAsync: jest.Mock };
+      workspaceState: typeof workspaceState;
+      webview: typeof webview;
+      logHandledError: jest.Mock;
+      getErrorMessage: jest.Mock;
+    };
+    return { handler, webview, workspaceState };
+  };
+
+  it('sends only safe feeds to the webview and removes credentials from public source data', async () => {
+    const { handler, webview } = makeHandler([
+      { name: 'Private', url: sourceUrl, authorizationHeader: 'Basic secret' },
+      { name: 'Unsupported', url: 'file:///packages' },
+    ], sourceUrl);
+
+    handler.loadConfiguration();
+    await Promise.resolve();
+
+    expect(handler.configuredSources).toHaveLength(1);
+    expect(handler.configuredSources[0].authorizationHeader).toBe('Basic secret');
+    expect(webview.postMessage).toHaveBeenCalledWith({
+      type: 'sources',
+      data: [{ name: 'Private', url: sourceUrl, authorizationHeader: undefined }],
+      selectedSourceUrl: sourceUrl,
+    });
+  });
+
+  it('clears a remembered source that is no longer configured', async () => {
+    const { handler, webview, workspaceState } = makeHandler([
+      { name: 'Public', url: sourceUrl, authorizationHeader: undefined },
+    ], 'https://removed.example/v3/index.json');
+
+    handler.loadConfiguration();
+    await Promise.resolve();
+
+    expect(workspaceState.update).toHaveBeenCalledWith('nuget-assistant.selectedSourceUrl', '');
+    expect(webview.postMessage).toHaveBeenCalledWith(expect.objectContaining({ selectedSourceUrl: '' }));
+  });
+
+  it('persists only an empty source selection or a configured feed URL', async () => {
+    const { handler, workspaceState } = makeHandler([
+      { name: 'Private', url: sourceUrl, authorizationHeader: undefined },
+    ], undefined);
+    handler.configuredSources = [{ name: 'Private', url: sourceUrl, authorizationHeader: undefined }];
+
+    await handler.saveSelectedSource(sourceUrl);
+    await handler.saveSelectedSource('');
+    await handler.saveSelectedSource('https://unknown.example/index.json');
+    await handler.saveSelectedSource(42);
+    await handler.saveSelectedSource('x'.repeat(2049));
+
+    expect(workspaceState.update).toHaveBeenCalledTimes(2);
+    expect(workspaceState.update).toHaveBeenNthCalledWith(1, 'nuget-assistant.selectedSourceUrl', sourceUrl);
+    expect(workspaceState.update).toHaveBeenNthCalledWith(2, 'nuget-assistant.selectedSourceUrl', '');
+  });
+
+  it('reports NuGet configuration load failures', async () => {
+    const { handler } = makeHandler([], undefined);
+    const error = new Error('invalid config');
+    handler.nuGetConfigLoader.loadAsync.mockRejectedValue(error);
+    const showError = jest.spyOn(vscode.window, 'showErrorMessage');
+
+    handler.loadConfiguration();
+    await Promise.resolve();
+
+    expect(handler.logHandledError).toHaveBeenCalledWith(expect.stringContaining('invalid config'), error);
+    expect(showError).toHaveBeenCalledWith(expect.stringContaining('invalid config'));
+  });
+});
+
+describe('WebviewMessageHandler startup flow', () => {
+  it('loads the opened project and package feeds, then reloads feeds on configuration changes', async () => {
+    const descriptors = [
+      [vscode.workspace, 'getConfiguration'],
+      [vscode.workspace, 'onDidChangeConfiguration'],
+      [vscode.tasks, 'onDidEndTask'],
+    ] as const;
+    const originals = descriptors.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)] as const);
+    let receiveMessage: ((message: unknown) => void) | undefined;
+    let configurationChanged: (() => void) | undefined;
+    const webview = {
+      postMessage: jest.fn().mockResolvedValue(true),
+      onDidReceiveMessage: jest.fn((callback: (message: unknown) => void) => { receiveMessage = callback; }),
+    };
+    const source = { name: 'Private', url: 'https://packages.example/v3/index.json', authorizationHeader: 'Basic secret' };
+    const project = { name: 'Demo.csproj', fsPath: path.resolve('workspace', 'Demo.csproj'), packages: [] };
+    const loadProject = jest.spyOn(ProjectFileLoader.prototype, 'loadProjectAsync').mockResolvedValue(project);
+    const loadSources = jest.spyOn(NuGetConfigLoader.prototype, 'loadAsync').mockResolvedValue([source]);
+
+    Object.defineProperty(vscode.workspace, 'getConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ get: (_key: string, fallback: unknown) => fallback })),
+    });
+    Object.defineProperty(vscode.workspace, 'onDidChangeConfiguration', {
+      configurable: true,
+      value: jest.fn((callback: () => void) => {
+        configurationChanged = callback;
+        return { dispose: jest.fn() };
+      }),
+    });
+    Object.defineProperty(vscode.tasks, 'onDidEndTask', {
+      configurable: true,
+      value: jest.fn(() => ({ dispose: jest.fn() })),
+    });
+
+    try {
+      const handler = new WebviewMessageHandler(
+        webview as never,
+        project.fsPath,
+        { appendLine: jest.fn() } as never,
+        { get: jest.fn(() => undefined), update: jest.fn() } as never
+      );
+
+      expect(webview.onDidReceiveMessage).toHaveBeenCalledTimes(1);
+      receiveMessage?.({ command: 'load-project' });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(loadProject).toHaveBeenCalledWith(project.fsPath);
+      expect(loadSources).toHaveBeenCalledTimes(1);
+      expect(webview.postMessage).toHaveBeenCalledWith({ type: 'project', data: project });
+      expect(webview.postMessage).toHaveBeenCalledWith({
+        type: 'sources',
+        data: [{ ...source, authorizationHeader: undefined }],
+        selectedSourceUrl: undefined,
+      });
+
+      configurationChanged?.();
+      await Promise.resolve();
+
+      expect(loadSources).toHaveBeenCalledTimes(2);
+      handler.dispose();
+    } finally {
+      loadProject.mockRestore();
+      loadSources.mockRestore();
+      for (const [target, key, descriptor] of originals) {
+        if (descriptor) {
+          Object.defineProperty(target, key, descriptor);
+        } else {
+          Reflect.deleteProperty(target, key);
+        }
+      }
+    }
+  });
+});
+
+describe('WebviewMessageHandler NuGet HTTP message flow', () => {
+  const sourceUrl = 'https://packages.example/v3/index.json';
+  const requestUrl = 'https://packages.example/query?q=Contoso';
+  const makeHandler = (requestResult: Promise<unknown>) => {
+    const webview = { postMessage: jest.fn() };
+    const requestText = jest.fn(() => requestResult);
+    const activeNuGetRequests = new Map();
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), {
+      configuredSources: [{ name: 'Private', url: sourceUrl, authorizationHeader: 'Basic secret' }],
+      activeNuGetRequests,
+      webview,
+      requestText,
+      sanitizeUrl: jest.fn((url: string) => url),
+      logHttpResponse: jest.fn(),
+      getErrorMessage: jest.fn((error: unknown) => error instanceof Error ? error.message : String(error)),
+      logError: jest.fn(),
+    }) as {
+      handleNuGetHttpRequest(message: unknown): Promise<void>;
+      activeNuGetRequests: Map<string, { cancelled: boolean; connections: Set<unknown> }>;
+      requestText: jest.Mock;
+      webview: typeof webview;
+      sanitizeUrl: jest.Mock;
+      logHttpResponse: jest.Mock;
+      logError: jest.Mock;
+    };
+    return { handler, requestText, webview };
+  };
+
+  const requestMessage = {
+    requestId: 'request-1',
+    url: requestUrl,
+    sourceUrl,
+    headers: { accept: 'application/json' },
+  };
+
+  it('sends valid requests through the configured feed and returns the response', async () => {
+    const result = { statusCode: 200, statusMessage: 'OK', body: '{"ok":true}' };
+    const { handler, requestText, webview } = makeHandler(Promise.resolve(result));
+
+    await handler.handleNuGetHttpRequest(requestMessage);
+
+    expect(requestText).toHaveBeenCalledWith(
+      new URL(requestUrl),
+      new URL(sourceUrl),
+      requestMessage.headers,
+      expect.objectContaining({ cancelled: false }),
+      expect.objectContaining({ authorizationHeader: 'Basic secret', authorizationAllowed: true })
+    );
+    expect(webview.postMessage).toHaveBeenCalledWith({ type: 'nuget-http-response', requestId: 'request-1', ...result });
+    expect(handler.activeNuGetRequests.size).toBe(0);
+  });
+
+  it('rejects a request for an unconfigured feed without making a network request', async () => {
+    const { handler, requestText, webview } = makeHandler(Promise.resolve({ statusCode: 200, body: '' }));
+
+    await handler.handleNuGetHttpRequest({ ...requestMessage, sourceUrl: 'https://unknown.example/index.json' });
+
+    expect(requestText).not.toHaveBeenCalled();
+    expect(webview.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'nuget-http-response', requestId: 'request-1', statusCode: 0,
+    }));
+  });
+
+  it('returns request failures to the webview and clears request state', async () => {
+    const { handler, webview } = makeHandler(Promise.reject(new Error('connection refused')));
+
+    await handler.handleNuGetHttpRequest(requestMessage);
+
+    expect(webview.postMessage).toHaveBeenCalledWith({
+      type: 'nuget-http-response', requestId: 'request-1', statusCode: 0, error: 'connection refused',
+    });
+    expect(handler.activeNuGetRequests.size).toBe(0);
   });
 });
 
@@ -545,6 +835,158 @@ describe('WebviewMessageHandler response handling', () => {
     expect(handler.sanitizeUrl('https://user:password@example.test/v3?api_key=secret&page=2'))
       .toBe('https://example.test/v3?api_key=%5Bredacted%5D&page=2');
     expect(handler.sanitizeUrl('not a URL')).toBe('not a URL');
+  });
+});
+
+describe('WebviewMessageHandler NuGet transport security', () => {
+  const getConfigurationDescriptor = Object.getOwnPropertyDescriptor(vscode.workspace, 'getConfiguration');
+  const dnsLookup = dns.promises.lookup as jest.Mock;
+  const httpRequest = http.request as unknown as jest.Mock;
+  const httpsRequest = https.request as unknown as jest.Mock;
+
+  const makeHandler = () => Object.assign(Object.create(WebviewMessageHandler.prototype), {
+    logHttpDebug: jest.fn(),
+    sanitizeUrl: jest.fn((value: string) => value),
+    getLoggingLevel: jest.fn(() => 'None'),
+    getDebugResponseBodyLimitKb: jest.fn(() => 32),
+  }) as {
+    requestText(
+      url: URL,
+      sourceUrl: URL,
+      headers: Record<string, string>,
+      activeRequest: { cancelled: boolean; connections: Set<unknown> },
+      context: { authorizationHeader?: string; redirects: number; originalOrigin: string; authorizationAllowed: boolean }
+    ): Promise<{ statusCode: number; statusMessage?: string; body: string }>;
+    logHttpDebug: jest.Mock;
+  };
+
+  beforeEach(() => {
+    dnsLookup.mockReset().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    httpRequest.mockReset();
+    httpsRequest.mockReset();
+    Object.defineProperty(vscode.workspace, 'getConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ get: (_key: string, fallback: unknown) => fallback })),
+    });
+  });
+
+  afterAll(() => {
+    if (getConfigurationDescriptor) {
+      Object.defineProperty(vscode.workspace, 'getConfiguration', getConfigurationDescriptor);
+    } else {
+      delete (vscode.workspace as unknown as Record<string, unknown>)['getConfiguration'];
+    }
+  });
+
+  it('blocks credentialed HTTP requests before DNS or transport access by default', async () => {
+    const handler = makeHandler();
+    const activeRequest = { cancelled: false, connections: new Set() };
+
+    await expect(handler.requestText(
+      new URL('http://packages.example/query'),
+      new URL('http://packages.example/index.json'),
+      {},
+      activeRequest,
+      { authorizationHeader: 'Basic secret', redirects: 0, originalOrigin: 'http://packages.example', authorizationAllowed: true }
+    )).rejects.toThrow('HTTP requests with NuGet source credentials are disabled');
+
+    expect(dnsLookup).not.toHaveBeenCalled();
+    expect(httpRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a NuGet service URL that resolves to a private address', async () => {
+    const handler = makeHandler();
+    dnsLookup.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+
+    await expect(handler.requestText(
+      new URL('https://metadata.example.test/service-index.json'),
+      new URL('https://packages.example/v3/index.json'),
+      {},
+      { cancelled: false, connections: new Set() },
+      { redirects: 0, originalOrigin: 'https://metadata.example.test', authorizationAllowed: false }
+    )).rejects.toThrow('local or private network address');
+
+    expect(httpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('stops cancelled requests and redirect chains beyond the allowed limit', async () => {
+    const handler = makeHandler();
+    const url = new URL('https://packages.example/query');
+    const sourceUrl = new URL('https://packages.example/index.json');
+
+    await expect(handler.requestText(
+      url,
+      sourceUrl,
+      {},
+      { cancelled: true, connections: new Set() },
+      { redirects: 0, originalOrigin: url.origin, authorizationAllowed: true }
+    )).rejects.toThrow('request cancelled');
+    await expect(handler.requestText(
+      url,
+      sourceUrl,
+      {},
+      { cancelled: false, connections: new Set() },
+      { redirects: 6, originalOrigin: url.origin, authorizationAllowed: true }
+    )).rejects.toThrow('Too many redirects');
+
+    expect(dnsLookup).not.toHaveBeenCalled();
+    expect(httpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('drops source authorization after a redirect to another origin', async () => {
+    const handler = makeHandler();
+    const activeRequest = { cancelled: false, connections: new Set() };
+    const responses: Array<{ statusCode: number; statusMessage: string; headers: Record<string, string>; body: string }> = [
+      { statusCode: 302, statusMessage: 'Found', headers: { location: 'https://cdn.example.test/package.json' }, body: '' },
+      { statusCode: 200, statusMessage: 'OK', headers: {}, body: '{"versions":[]}' },
+    ];
+    httpsRequest.mockImplementation((_url, options, callback) => {
+      const request = new EventEmitter() as EventEmitter & { end: jest.Mock; destroy: jest.Mock };
+      request.destroy = jest.fn();
+      request.end = jest.fn(() => {
+        const responseData = responses.shift();
+        if (!responseData) {
+          throw new Error('Unexpected HTTPS request');
+        }
+        const response = new EventEmitter() as EventEmitter & {
+          statusCode: number;
+          statusMessage: string;
+          headers: Record<string, string>;
+          resume: jest.Mock;
+        };
+        response.statusCode = responseData.statusCode;
+        response.statusMessage = responseData.statusMessage;
+        response.headers = responseData.headers;
+        response.resume = jest.fn();
+        callback(response);
+        if (responseData.statusCode === 200) {
+          response.emit('data', Buffer.from(responseData.body));
+          response.emit('end');
+        }
+        request.emit('close');
+      });
+      expect(options.headers).toEqual(expect.objectContaining({ 'accept-encoding': 'gzip' }));
+      return request;
+    });
+
+    const response = await handler.requestText(
+      new URL('https://packages.example/query'),
+      new URL('https://packages.example/index.json'),
+      { accept: 'application/json', authorization: 'webview supplied value', 'x-ignore': 'value' },
+      activeRequest,
+      { authorizationHeader: 'Basic configured-secret', redirects: 0, originalOrigin: 'https://packages.example', authorizationAllowed: true }
+    );
+
+    expect(response).toEqual({ statusCode: 200, statusMessage: 'OK', body: '{"versions":[]}' });
+    expect(httpsRequest).toHaveBeenCalledTimes(2);
+    expect((httpsRequest.mock.calls[0][1] as { headers: Record<string, string> }).headers).toEqual({
+      accept: 'application/json', 'accept-encoding': 'gzip', authorization: 'Basic configured-secret',
+    });
+    expect((httpsRequest.mock.calls[1][1] as { headers: Record<string, string> }).headers).toEqual({
+      accept: 'application/json', 'accept-encoding': 'gzip',
+    });
+    expect(dnsLookup).toHaveBeenCalledTimes(2);
+    expect(activeRequest.connections.size).toBe(0);
   });
 });
 

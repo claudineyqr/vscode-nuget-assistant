@@ -209,7 +209,7 @@ export class ProjectFileEditor {
       const prefix = content.slice(lineStart, start);
       const suffix = content.slice(end, trailingEnd);
 
-      if (/^[\t ]*$/.test(prefix) && /^[\t ]*$/.test(suffix)) {
+      if (/^[\t ]*$/.test(prefix) && /^[\t \r]*$/.test(suffix)) {
         start = lineStart;
         end = lineEnd < 0 ? content.length : lineEnd + 1;
       }

@@ -29,6 +29,16 @@ describe('ProjectFileEditor', () => {
     expect(fs.readFileSync(projectPath, 'utf8')).toBe(original);
   });
 
+  it('creates an item group when the project has none', () => {
+    fs.writeFileSync(projectPath, '<Project>\n</Project>\n', 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', '2.1.0');
+
+    expect(fs.readFileSync(projectPath, 'utf8')).toBe(
+      '<Project>\n  <ItemGroup>\n    <PackageReference Include="Contoso.Widget" Version="2.1.0" />\n  </ItemGroup>\n</Project>\n'
+    );
+  });
+
   it('updates every matching reference without changing unrelated packages', () => {
     const original = [
       '<Project>',
@@ -47,6 +57,18 @@ describe('ProjectFileEditor', () => {
     expect(updated.match(/Version="2\.5\.0"/g)).toHaveLength(1);
     expect(updated).toContain('<Version>2.5.0</Version>');
     expect(updated).toContain('Include="Other.Package" Version="3.0.0"');
+  });
+
+  it('updates single-quoted attributes and XML version elements', () => {
+    const original = '<Project><ItemGroup><PackageReference Include=\'Contoso.Widget\' Version=\'1.0.0\' /><PackageReference Include="Other.Package"><Version>1.0.0</Version></PackageReference></ItemGroup></Project>';
+    fs.writeFileSync(projectPath, original, 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', '2&3');
+    editor.apply(projectPath, 'Other.Package', '4.5.0');
+
+    const updated = fs.readFileSync(projectPath, 'utf8');
+    expect(updated).toContain("Version='2&amp;3'");
+    expect(updated).toContain('<Version>4.5.0</Version>');
   });
 
   it('applies several package updates together and rolls the whole batch back', () => {
@@ -111,6 +133,34 @@ describe('ProjectFileEditor', () => {
     expect(fs.readFileSync(projectPath, 'utf8')).toBe(original);
   });
 
+  it('removes the complete reference line from a CRLF project file', () => {
+    const original = '<Project>\r\n  <ItemGroup>\r\n    <PackageReference Include="Contoso.Widget" Version="1.0.0" />\r\n    <PackageReference Include="Other.Package" Version="3.0.0" />\r\n  </ItemGroup>\r\n</Project>\r\n';
+    const expected = '<Project>\r\n  <ItemGroup>\r\n    <PackageReference Include="Other.Package" Version="3.0.0" />\r\n  </ItemGroup>\r\n</Project>\r\n';
+    fs.writeFileSync(projectPath, original, 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', undefined);
+
+    expect(fs.readFileSync(projectPath, 'utf8')).toBe(expected);
+  });
+
+  it('removes a multiline reference with child elements and keeps adjacent inline XML', () => {
+    const original = '<Project><ItemGroup><PackageReference Include="Contoso.Widget">\n  <Version>1.0.0</Version>\n</PackageReference><PackageReference Include="Other.Package" /></ItemGroup></Project>';
+    fs.writeFileSync(projectPath, original, 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', undefined);
+
+    expect(fs.readFileSync(projectPath, 'utf8')).toBe('<Project><ItemGroup><PackageReference Include="Other.Package" /></ItemGroup></Project>');
+  });
+
+  it('does not remove package references found only in XML comments', () => {
+    const original = '<Project>\n  <!-- <PackageReference Include="Contoso.Widget" Version="1.0.0" /> -->\n</Project>\n';
+    fs.writeFileSync(projectPath, original, 'utf8');
+
+    expect(() => editor.apply(projectPath, 'Contoso.Widget', undefined))
+      .toThrow('Package Contoso.Widget is not referenced by Demo.csproj.');
+    expect(fs.readFileSync(projectPath, 'utf8')).toBe(original);
+  });
+
   it('updates central package versions and rolls back both project files', () => {
     const projectOriginal = '<Project>\n  <ItemGroup>\n  </ItemGroup>\n</Project>\n';
     const centralPath = path.join(tempFolder, 'Directory.Packages.props');
@@ -125,6 +175,32 @@ describe('ProjectFileEditor', () => {
     rollback();
     expect(fs.readFileSync(projectPath, 'utf8')).toBe(projectOriginal);
     expect(fs.readFileSync(centralPath, 'utf8')).toBe(centralOriginal);
+  });
+
+  it('adds missing central version entries when central version management is enabled', () => {
+    const projectOriginal = '<Project>\n  <ItemGroup>\n    <PackageReference Include="Contoso.Widget" Version="1.0.0" />\n  </ItemGroup>\n</Project>\n';
+    const centralPath = path.join(tempFolder, 'Directory.Packages.props');
+    const centralOriginal = '<Project>\n  <PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup>\n  <ItemGroup>\n  </ItemGroup>\n</Project>\n';
+    fs.writeFileSync(projectPath, projectOriginal, 'utf8');
+    fs.writeFileSync(centralPath, centralOriginal, 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', '2.1.0');
+
+    expect(fs.readFileSync(projectPath, 'utf8')).toContain('<PackageReference Include="Contoso.Widget" />');
+    expect(fs.readFileSync(centralPath, 'utf8')).toContain('<PackageVersion Include="Contoso.Widget" Version="2.1.0" />');
+  });
+
+  it('uses an existing central entry and removes local version declarations', () => {
+    const projectOriginal = '<Project><ItemGroup><PackageReference Include="Contoso.Widget" Version="1.0.0" VersionOverride="1.5.0"><Version>1.2.0</Version><VersionOverride>1.7.0</VersionOverride></PackageReference></ItemGroup></Project>';
+    const centralPath = path.join(tempFolder, 'Directory.Packages.props');
+    const centralOriginal = '<Project><ItemGroup><PackageVersion Include="Contoso.Widget" Version="1.0.0" /></ItemGroup></Project>';
+    fs.writeFileSync(projectPath, projectOriginal, 'utf8');
+    fs.writeFileSync(centralPath, centralOriginal, 'utf8');
+
+    editor.apply(projectPath, 'Contoso.Widget', '2.0.0');
+
+    expect(fs.readFileSync(projectPath, 'utf8')).toBe('<Project><ItemGroup><PackageReference Include="Contoso.Widget"></PackageReference></ItemGroup></Project>');
+    expect(fs.readFileSync(centralPath, 'utf8')).toContain('Version="2.0.0"');
   });
 
   it('throws when removing a package that is not referenced', () => {

@@ -180,6 +180,7 @@
     "vscode:prepublish": "npm run package-all",
     "lint": "ng lint",
     "test": "jest",
+    "test:e2e": "node tests/vscode/runTest.cjs",
     "test-coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "sonar-scan": "sonar-scanner-npm"
@@ -232,6 +233,8 @@
     "angular-eslint": "^22.6.0",
     "eslint": "^10.14.0",
     "jest": "^30.5.2",
+    "@vscode/test-electron": "^2.5.2",
+    "mocha": "^11.7.1",
     "jest-environment-jsdom": "^30.5.2",
     "jest-preset-angular": "^17.0.3",
     "postcss": "^8.5.32",

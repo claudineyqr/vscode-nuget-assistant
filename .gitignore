@@ -2,6 +2,7 @@
 
 # Compiled output
 /dist
+/.vscode-test
 /tmp
 /out-tsc
 /bazel-out
@@ -47,3 +48,7 @@ Thumbs.db
 
 nupkg/
 .scannerwork/
+tests/fixtures/CentralPackageHarness/obj/
+tests/fixtures/CentralPackageHarness/bin/
+tests/fixtures/PackageEditHarness/obj/
+tests/fixtures/PackageEditHarness/bin/

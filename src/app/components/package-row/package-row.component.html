@@ -12,11 +12,11 @@
   }
   <button type="button"
     class="package-row-select flex min-w-0 flex-1 select-none cursor-pointer items-start rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
-    aria-label="Select package {{ package.id }}" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
+    [attr.aria-label]="'Select package ' + package.id" i18n-aria-label="@@packageRow.selectButton.accessibleLabel"
     (click)="click()">
-    <div class="icon relative ml-0.5 mr-3 size-10 shrink-0 overflow-hidden rounded-md bg-vscode-secondary/60">
+    <div class="icon relative ml-0.5 mr-3 size-10 shrink-0 rounded-md bg-vscode-secondary/60">
       @if (package.iconUrl) {
-      <img class="size-full object-contain" [src]="package.iconUrl" alt="{{ package.id }} icon"
+      <img class="size-full rounded-md object-contain" [src]="package.iconUrl" alt="{{ package.id }} icon"
         i18n-alt="@@package.icon.alt" (error)="package.iconUrl = ''" />
       }
       @if (!package.iconUrl) {
@@ -24,11 +24,20 @@
         icon="cubes"></fa-icon>
       }
       @if (package.isInstalled) {
-      <fa-stack class="status-icon absolute -bottom-1 -right-1 rounded-full bg-vscode-editor p-0.5 text-sm" size="1x">
-        <fa-icon icon="circle" stackItemSize="1x"></fa-icon>
-        <fa-icon class="actual-icon" [ngClass]="package.isOutdated ? 'text-vscode-info' : 'text-vscode-success'"
-          [icon]="package.isOutdated ? 'circle-up' : 'circle-check'" stackItemSize="1x"></fa-icon>
-      </fa-stack>
+      <svg class="installed-status-icon absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-vscode-editor"
+        [attr.aria-label]="installedStatusTitle" [attr.title]="installedStatusTitle" role="img" focusable="false"
+        viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <title>{{ installedStatusTitle }}</title>
+        <circle cx="12" cy="12" r="12"
+          [attr.fill]="package.isOutdated ? 'var(--vscode-editorInfo-foreground, var(--vscode-foreground))' : 'var(--vscode-testing-iconPassed, var(--vscode-foreground))'" />
+        @if (package.isOutdated) {
+        <path d="M12 17V7m0 0L7.5 11.5M12 7l4.5 4.5" stroke="white" stroke-width="2.25" stroke-linecap="round"
+          stroke-linejoin="round" />
+        } @else {
+        <path d="m6.5 12.5 3.5 3.5 7.5-8" stroke="white" stroke-width="2.25" stroke-linecap="round"
+          stroke-linejoin="round" />
+        }
+      </svg>
       }
     </div>
     <div class="description-container min-w-0 flex-1 overflow-hidden">
@@ -45,6 +54,11 @@
           [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-muted'"
           i18n="@@packageRow.authors.prefix">by {{ package.authors
           }}</span>
+        }
+        @if (package.sourceName) {
+        <span class="source ml-2 text-xs"
+          [ngClass]="isActive ? 'text-vscode-selection-foreground' : 'text-vscode-muted'"
+          i18n="@@packageRow.source.prefix">source {{ package.sourceName }}</span>
         }
       </div>
       <div class="mt-1 line-clamp-2 text-xs leading-4"
@@ -80,7 +94,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="install($event)" title="Install {{ package.id }}" i18n-title="@@packageRow.installButton.label"
-      aria-label="Install {{ package.id }}" i18n-aria-label="@@packageRow.installButton.label">
+      [attr.aria-label]="'Install ' + package.id" i18n-aria-label="@@packageRow.installButton.label">
       <fa-icon icon="arrow-down"></fa-icon>
     </button>
     }
@@ -88,7 +102,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="uninstall($event)" title="Uninstall {{ package.id }}" i18n-title="@@packageRow.uninstallButton.label"
-      aria-label="Uninstall {{ package.id }}" i18n-aria-label="@@packageRow.uninstallButton.label">
+      [attr.aria-label]="'Uninstall ' + package.id" i18n-aria-label="@@packageRow.uninstallButton.label">
       <fa-icon icon="xmark"></fa-icon>
     </button>
     }
@@ -96,7 +110,7 @@
     <button
       class="button secondary inline-flex size-7 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
       (click)="update($event)" title="Update {{ package.id }}" i18n-title="@@packageRow.updateButton.label"
-      aria-label="Update {{ package.id }}" i18n-aria-label="@@packageRow.updateButton.label">
+      [attr.aria-label]="'Update ' + package.id" i18n-aria-label="@@packageRow.updateButton.label">
       <fa-icon icon="arrow-up"></fa-icon>
     </button>
     }

@@ -52,6 +52,75 @@ describe('NuGetApiService', () => {
     expect(new URL(requestUrl).searchParams.get('semVerLevel')).toBe('2.0.0');
   });
 
+  it('preserves V3 feed order and includes the source name on Browse rows', async () => {
+    const orderedSource: PackageSource = { ...source, name: 'Ordered feed' };
+    const http = createHttpMock((url) => {
+      if (url === orderedSource.url) {
+        return of(JSON.stringify({ resources: [{ '@id': 'https://packages.example.test/query', '@type': 'SearchQueryService' }] }));
+      }
+      return of({
+        totalHits: 2,
+        data: [
+          { id: 'Z.First', version: '1.0.0', description: '', authors: '', iconUrl: '', verified: false },
+          { id: 'A.Second', version: '1.0.0', description: '', authors: '', iconUrl: '', verified: false },
+        ],
+      });
+    });
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.search('', false, orderedSource));
+
+    expect(results.map(({ id, sourceName }) => [id, sourceName])).toEqual([
+      ['Z.First', 'Ordered feed'],
+      ['A.Second', 'Ordered feed'],
+    ]);
+  });
+
+  it('preserves per-source Browse order and keeps the same package ID from different sources', async () => {
+    const firstSource: PackageSource = { name: 'First feed', url: 'https://first.example/v3/index.json', authorizationHeader: undefined };
+    const secondSource: PackageSource = { name: 'Second feed', url: 'https://second.example/v3/index.json', authorizationHeader: undefined };
+    const firstSearchUrl = 'https://first.example/query';
+    const secondSearchUrl = 'https://second.example/query';
+    const http = createHttpMock((url) => {
+      if (url === firstSource.url) {
+        return of(JSON.stringify({ resources: [{ '@id': firstSearchUrl, '@type': 'SearchQueryService' }] }));
+      }
+      if (url === secondSource.url) {
+        return of(JSON.stringify({ resources: [{ '@id': secondSearchUrl, '@type': 'SearchQueryService' }] }));
+      }
+      if (url.startsWith(firstSearchUrl)) {
+        return of({
+          totalHits: 3,
+          data: [
+            { id: 'Z.First', version: '1.0.0', description: '', authors: '', iconUrl: '', verified: false },
+            { id: 'Shared.Package', version: '1.0.0', description: 'from first', authors: '', iconUrl: '', verified: false },
+            { id: 'shared.package', version: '0.9.0', description: 'duplicate in first feed', authors: '', iconUrl: '', verified: false },
+          ],
+        });
+      }
+      if (url.startsWith(secondSearchUrl)) {
+        return of({
+          totalHits: 2,
+          data: [
+            { id: 'Shared.Package', version: '2.0.0', description: 'from second', authors: '', iconUrl: '', verified: false },
+            { id: 'A.Last', version: '1.0.0', description: '', authors: '', iconUrl: '', verified: false },
+          ],
+        });
+      }
+      return throwError(() => new Error(`Unexpected URL: ${url}`));
+    });
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.searchAll('', false, [firstSource, secondSource]));
+
+    expect(results.map(({ id, sourceName, version }) => [id, sourceName, version])).toEqual([
+      ['Z.First', 'First feed', '1.0.0'],
+      ['Shared.Package', 'First feed', '1.0.0'],
+      ['Shared.Package', 'Second feed', '2.0.0'],
+      ['A.Last', 'Second feed', '1.0.0'],
+    ]);
+  });
+
   it.each([
     'SearchQueryService',
     'SearchQueryService/3.0.0-beta',
@@ -151,6 +220,26 @@ describe('NuGetApiService', () => {
     expect(new URL(String(searchUrl)).searchParams.get('searchTerm')).toBe("'Example'");
     expect(new URL(String(searchUrl)).searchParams.get('includePrerelease')).toBe('false');
     expect(new URL(String(searchUrl)).searchParams.get('semVerLevel')).toBe('2.0.0');
+  });
+
+  it('preserves V2 Browse result order and includes the source name', async () => {
+    const v2Source: PackageSource = { ...source, name: 'Ordered V2 feed', url: 'https://packages.example.test/api/v2' };
+    const http = createHttpMock((url) =>
+      of(url === v2Source.url
+        ? '<service xmlns="http://www.w3.org/2007/app"></service>'
+        : v2Feed([
+            { id: 'Z.First', version: '1.0.0', description: '' },
+            { id: 'A.Second', version: '1.0.0', description: '' },
+          ]))
+    );
+    const service = createService(http);
+
+    const results = await firstValueFrom(service.search('', false, v2Source));
+
+    expect(results.map(({ id, sourceName }) => [id, sourceName])).toEqual([
+      ['Z.First', 'Ordered V2 feed'],
+      ['A.Second', 'Ordered V2 feed'],
+    ]);
   });
 
   it('uses the configured nuget.org V2 feed base and requests an Atom response', async () => {

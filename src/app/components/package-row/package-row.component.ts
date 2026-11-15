@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { PackageRowModel } from '../../models/package-row-model';
 import { PackageManagerService } from '../../services/package-manager.service';
 import { NgClass, SlicePipe } from '@angular/common';
-import { FaIconComponent, FaStackComponent, FaStackItemSizeDirective } from '@fortawesome/angular-fontawesome';
+import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 
 @Component({
   selector: 'app-package-row',
@@ -12,8 +12,6 @@ import { FaIconComponent, FaStackComponent, FaStackItemSizeDirective } from '@fo
   imports: [
     NgClass,
     FaIconComponent,
-    FaStackComponent,
-    FaStackItemSizeDirective,
     SlicePipe
   ],
 })
@@ -53,6 +51,12 @@ export class PackageRowComponent {
       Boolean(this.package?.installedVersionMetadata?.deprecation),
       (this.package?.installedVersionMetadata?.vulnerabilities?.length ?? 0) > 0
     );
+  }
+
+  public get installedStatusTitle(): string {
+    return this.package?.isOutdated
+      ? $localize`:@@packageRow.installedUpdateAvailable:Installed, update available`
+      : $localize`:@@packageRow.installedStatus:Installed`;
   }
 
   private getWarningTitle(isDeprecated: boolean, hasVulnerabilities: boolean): string | undefined {

@@ -1,1 +1,3 @@
-/* Component-scoped styles can be added here when needed. */
+.package-details {
+  overflow-wrap: anywhere;
+}

@@ -27,6 +27,8 @@ export class PackageListComponent extends BaseComponent implements OnInit {
 
   public currentSelectedPackageId: string | null = null;
 
+  public currentSelectedPackageSourceUrl: string | null = null;
+
   public isSolutionMode = false;
 
   public get showSelectCheckboxes(): boolean {
@@ -90,6 +92,11 @@ export class PackageListComponent extends BaseComponent implements OnInit {
     this.subscriptions.add(
       this.packageManager.currentSelectedPackageId.subscribe((selectedPackageId: string | null) => {
         this.currentSelectedPackageId = selectedPackageId;
+      })
+    );
+    this.subscriptions.add(
+      this.packageManager.currentSelectedPackageSourceUrl?.subscribe((sourceUrl: string | null) => {
+        this.currentSelectedPackageSourceUrl = sourceUrl;
       })
     );
   }

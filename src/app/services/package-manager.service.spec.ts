@@ -261,6 +261,34 @@ describe('PackageManagerService', () => {
     service.changeCurrentSelectedPackage(selectedPackage);
   });
 
+  test('selects package details from the selected feed when IDs are shared across sources', () => {
+    const firstSource: PackageSource = {
+      name: 'First feed',
+      url: 'https://first.example/v3/index.json',
+      authorizationHeader: undefined,
+    };
+    const secondSource: PackageSource = {
+      name: 'Second feed',
+      url: 'https://second.example/v3/index.json',
+      authorizationHeader: undefined,
+    };
+    service.changeCurrentSources([firstSource, secondSource]);
+    nugetApiServiceMock.searchAll.mockReturnValue(of([]));
+    nugetApiServiceMock.searchByPackageIds.mockReturnValue(of([]));
+    service.queryForPackages('', false, ALL_PACKAGE_SOURCES);
+
+    const selectedSourceUrls: Array<string | null> = [];
+    service.currentSelectedPackageSourceUrl.subscribe((sourceUrl) => selectedSourceUrls.push(sourceUrl));
+    const firstCopy = { ...getMockApiPackages()[0], id: 'Shared.Package', sourceUrl: firstSource.url };
+    const secondCopy = { ...getMockApiPackages()[0], id: 'Shared.Package', sourceUrl: secondSource.url };
+
+    service.changeCurrentSelectedPackage(firstCopy);
+    service.changeCurrentSelectedPackage(secondCopy);
+
+    expect(nugetApiServiceMock.searchByPackageIds.mock.calls.map(([, , , source]) => source)).toEqual([firstSource, secondSource]);
+    expect(selectedSourceUrls.slice(-2)).toEqual([firstSource.url, secondSource.url]);
+  });
+
   test('queryForPackages should set currents to null', (done) => {
     const query = 'test';
     const prerelease = false;

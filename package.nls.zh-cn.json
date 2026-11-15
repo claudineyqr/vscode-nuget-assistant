@@ -3,6 +3,10 @@
   "command.manageProjectPackages": "NuGet Assistant: 管理项目包",
   "command.manageSolutionPackages": "NuGet Assistant: 管理解决方案包",
   "setting.allowInsecureHttpCredentials": "允许通过未加密的 HTTP 连接发送 NuGet 包源凭据。仅对受信任的包源和网络环境启用此选项。",
+  "setting.packageExecutionMode": "用于安装、更新和卸载包的模式。",
+  "setting.packageExecutionMode.dotnet": "使用 dotnet add/remove package 命令。",
+  "setting.packageExecutionMode.projectFile": "直接编辑项目包引用并运行 dotnet restore。",
+  "setting.showTaskWindow": "NuGet Assistant 执行包操作时显示 VS Code Tasks 窗口。",
   "setting.loggingLevel": "控制写入 NuGet Assistant 输出通道的日志详细程度。",
   "setting.loggingLevel.none": "禁用输出通道中的所有日志记录。",
   "setting.loggingLevel.information": "记录常规活动、HTTP 响应状态代码和错误。",
@@ -26,5 +30,11 @@
   "error.loadNugetConfig": "加载 NuGet.Config 时出错：{0}",
   "error.invalidProjectXml": "项目文件包含无效的 XML：{0}",
   "error.invalidCentralPackagesXml": "中央包管理文件包含无效的 XML：{0}",
-  "error.invalidNugetConfigXml": "NuGet 配置文件“{0}”包含无效的 XML：{1}"
+  "error.invalidNugetConfigXml": "NuGet 配置文件“{0}”包含无效的 XML：{1}",
+  "error.restoreRollbackFailed": "包 {0} 还原失败，且回滚也失败：{1}",
+  "error.restorePackageOperation": "包 {0} 还原失败；项目文件更改已回滚。{1}",
+  "error.restoreBatchOperation": "所选包更新 {0} 还原失败；所有项目文件更改均已回滚。{1}",
+  "error.restoreBatchRollbackFailed": "所选包更新 {0} 还原失败，且回滚也失败：{1}",
+  "error.restoreBatchSelectiveRollback": "包 {0} 还原失败；这些更新已回滚，其余所选更新已应用。{1}",
+  "error.restoreExitCode": "还原以代码 {0} 退出。"
 }

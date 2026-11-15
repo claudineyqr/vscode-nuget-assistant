@@ -22,14 +22,16 @@ You can also launch these commands from the Command Palette (`Ctrl+Shift+P`) by 
 - Install a specific package version.
 - Update or uninstall installed packages.
 - Update multiple packages simultaneously.
+- Choose how package changes are applied: with the .NET CLI (`dotnet`) or by editing project files (`projectFile`).
 - View package details, including descriptions, authors, licenses, dependencies, tags, and project links.
 - View known vulnerabilities and related security advisories.
+- Support for Central Package Management: NuGet Assistant can add, update, and remove package references in projects that use Directory.Packages.props to centrally manage package versions.
 - Supports NuGet V2 and V3 feeds, including nuget.org, Azure Artifacts, GitHub Packages, GitLab, MyGet, JFrog Artifactory, Sonatype Nexus, ProGet, and other compatible private feeds.
 - Works on Linux, macOS, and Windows.
 - Fits naturally into your VS Code setup, adapting to light, dark, and high-contrast themes.
 - Supports English, Brazilian Portuguese, and Simplified Chinese. By default, the extension follows the VS Code display language, with an option to choose a language explicitly in settings.
 
-Package operations are executed through the `dotnet` CLI. Ensure that the .NET SDK is installed and available in your `PATH`.
+Package operations use the .NET SDK. Ensure it is installed and available in your `PATH`.
 
 ## Extension Settings
 
@@ -41,6 +43,8 @@ Configure these options in your VS Code User or Workspace settings:
 | `nuget-assistant.loggingLevel` | `None` | Output channel logging detail: `None` disables logging, `Information` logs routine activity, HTTP response status codes, and errors, `Error` logs errors only, and `Debug` logs routine activity and detailed HTTP requests and responses, including response bodies up to the configured limit. |
 | `nuget-assistant.debugResponseBodyLimitKb` | `32` | Maximum response body size, in KiB, written to the output channel when `loggingLevel` is `Debug`. Range: `0`–`5120`; set to `0` to omit response bodies. |
 | `nuget-assistant.allowInsecureHttpCredentials` | `false` | Allows NuGet source credentials to be sent over unencrypted HTTP connections. Enable only for trusted package sources and network environments. |
+| `nuget-assistant.packageExecutionMode` | `projectFile` | Choose how package changes are applied: through the .NET CLI or by editing C# project files directly. (`dotnet` or `projectFile`) |
+| `nuget-assistant.showTaskWindow` | `false` | Show package operation progress in the VS Code Tasks window. |
 
 ## Package Source Configuration
 

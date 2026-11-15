@@ -35,6 +35,8 @@ export class PackageDetailsComponent extends BaseComponent implements OnInit {
   public readonly updateLabel = $localize`:@@packageDetails.update.button:Update`;
   public package: PackageRowModel | null = null;
   public isLoading = false;
+  public projectsCount = 0;
+  public selectedProjectPaths: string[] = [];
   private currentSelectedPackageId: string | null = null;
   private currentCategory = Category.Browse;
   private readonly numericDateFormatter: Intl.DateTimeFormat;
@@ -49,13 +51,21 @@ export class PackageDetailsComponent extends BaseComponent implements OnInit {
     return this.package?.isInstalled === true && this.selectedVersionObject?.version === this.package.installedVersion;
   }
 
+  public get hasProjectSelected(): boolean {
+    return this.projectsCount <= 1 || this.selectedProjectPaths.length > 0;
+  }
+
   public get reportAbuseUrl(): string | undefined {
     const packageId = this.package?.id;
     const version = this.selectedVersionObject?.version;
     if (!packageId || !version) {
       return undefined;
     }
-    return `https://www.nuget.org/packages/${encodeURIComponent(packageId)}/${encodeURIComponent(version)}/ReportAbuse`;
+    if (this.selectedVersionObject?.licenseUrl.includes('nuget.org')) {
+      return `https://www.nuget.org/packages/${encodeURIComponent(packageId)}/${encodeURIComponent(version)}/ReportAbuse`;
+    } else {
+      return undefined;
+    }
   }
 
   constructor(private readonly packageManager: PackageManagerService, @Inject(LOCALE_ID) locale: string) {
@@ -73,6 +83,8 @@ export class PackageDetailsComponent extends BaseComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.subscriptions.add(this.packageManager.currentProjects.subscribe((projects) => (this.projectsCount = projects.length)));
+    this.subscriptions.add(this.packageManager.selectedProjectPaths.subscribe((paths) => (this.selectedProjectPaths = paths)));
     this.listenForCurrentSelectedPackageId();
     this.listenForCurrentCategory();
     this.listenForCurrentPackage();

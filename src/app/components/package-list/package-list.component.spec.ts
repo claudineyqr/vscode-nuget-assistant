@@ -1,18 +1,24 @@
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject } from 'rxjs';
+import { By } from '@angular/platform-browser';
+import { FaIconLibrary } from '@fortawesome/angular-fontawesome';
+import { fas } from '@fortawesome/free-solid-svg-icons';
 import { Category } from '../../models/category';
 import { PackageRowModel } from '../../models/package-row-model';
 import { PackageManagerService } from '../../services/package-manager.service';
+import { PackageRowComponent } from '../package-row/package-row.component';
 import { PackageListComponent } from './package-list.component';
 
 describe('PackageListComponent selection', () => {
   const packages = new BehaviorSubject<PackageRowModel[] | null>(null);
   const selectedPackageId = new BehaviorSubject<string | null>(null);
+  const selectedPackageSourceUrl = new BehaviorSubject<string | null>(null);
   const category = new BehaviorSubject<Category>(Category.Browse);
   const solutionMode = new BehaviorSubject(false);
   const packageManager = {
     currentPackages: packages,
     currentSelectedPackageId: selectedPackageId,
+    currentSelectedPackageSourceUrl: selectedPackageSourceUrl,
     currentCategory: category,
     isSolutionMode: solutionMode,
     installPackages: jest.fn(),
@@ -21,6 +27,7 @@ describe('PackageListComponent selection', () => {
   beforeEach(async () => {
     packages.next(null);
     selectedPackageId.next(null);
+    selectedPackageSourceUrl.next(null);
     category.next(Category.Browse);
     solutionMode.next(false);
     jest.clearAllMocks();
@@ -28,6 +35,7 @@ describe('PackageListComponent selection', () => {
       imports: [PackageListComponent],
       providers: [{ provide: PackageManagerService, useValue: packageManager }],
     }).compileComponents();
+    TestBed.inject(FaIconLibrary).addIconPacks(fas);
   });
 
   it('selects and deselects rows and reports when every package is selected', () => {
@@ -83,5 +91,26 @@ describe('PackageListComponent selection', () => {
     solutionMode.next(true);
 
     expect(fixture.componentInstance.isSolutionMode).toBe(true);
+  });
+
+  it('highlights only the selected source when the same package ID appears in multiple feeds', () => {
+    const fixture = TestBed.createComponent(PackageListComponent);
+    fixture.detectChanges();
+    packages.next([
+      {
+        id: 'Shared.Package', version: '1.0.0', description: 'First feed copy', authors: '', iconUrl: '', verified: false,
+        installedVersion: '', isInstalled: false, isOutdated: false, sourceUrl: 'https://first.example/v3/index.json', versions: undefined,
+      },
+      {
+        id: 'Shared.Package', version: '2.0.0', description: 'Second feed copy', authors: '', iconUrl: '', verified: false,
+        installedVersion: '', isInstalled: false, isOutdated: false, sourceUrl: 'https://second.example/v3/index.json', versions: undefined,
+      },
+    ]);
+    selectedPackageId.next('Shared.Package');
+    selectedPackageSourceUrl.next('https://second.example/v3/index.json');
+    fixture.detectChanges();
+
+    const rows = fixture.debugElement.queryAll(By.directive(PackageRowComponent));
+    expect(rows.map((row) => row.componentInstance.isActive)).toEqual([false, true]);
   });
 });

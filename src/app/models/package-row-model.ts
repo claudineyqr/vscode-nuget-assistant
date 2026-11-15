@@ -7,6 +7,7 @@ export interface PackageRowModel extends PackageSearchResult {
   installedProjectPaths?: string[];
   isInstalled: boolean;
   isOutdated: boolean;
+  sourceName?: string;
   sourceUrl: string;
   versions: CatalogEntry[] | undefined;
 }

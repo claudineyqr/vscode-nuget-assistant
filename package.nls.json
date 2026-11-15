@@ -3,6 +3,10 @@
   "command.manageProjectPackages": "NuGet Assistant: Manage Project Packages",
   "command.manageSolutionPackages": "NuGet Assistant: Manage Solution Packages",
   "setting.allowInsecureHttpCredentials": "Allow NuGet source credentials to be sent over unencrypted HTTP connections. Enable only for trusted package sources and network environments.",
+  "setting.packageExecutionMode": "Mode used to install, update, and uninstall packages.",
+  "setting.packageExecutionMode.dotnet": "Use dotnet add/remove package commands.",
+  "setting.packageExecutionMode.projectFile": "Edit project package references directly and run dotnet restore.",
+  "setting.showTaskWindow": "Show the VS Code Tasks window while NuGet Assistant runs package operations.",
   "setting.loggingLevel": "Controls the detail written to the NuGet Assistant output channel.",
   "setting.loggingLevel.none": "Disable all logging to the output channel.",
   "setting.loggingLevel.information": "Log routine activity, HTTP response status codes, and errors.",
@@ -26,5 +30,11 @@
   "error.loadNugetConfig": "Error loading NuGet.Config: {0}",
   "error.invalidProjectXml": "The project file contains invalid XML: {0}",
   "error.invalidCentralPackagesXml": "The central package file contains invalid XML: {0}",
-  "error.invalidNugetConfigXml": "The NuGet configuration \"{0}\" contains invalid XML: {1}"
+  "error.invalidNugetConfigXml": "The NuGet configuration \"{0}\" contains invalid XML: {1}",
+  "error.restoreRollbackFailed": "Restore failed for package {0}, and rollback also failed: {1}",
+  "error.restorePackageOperation": "Restore failed for package {0}; project file changes were rolled back. {1}",
+  "error.restoreBatchOperation": "Restore failed for selected package updates {0}; all project file changes were rolled back. {1}",
+  "error.restoreBatchRollbackFailed": "Restore failed for selected package updates {0}, and rollback also failed: {1}",
+  "error.restoreBatchSelectiveRollback": "Restore failed for {0}; those updates were rolled back and the other selected updates were restored. {1}",
+  "error.restoreExitCode": "Restore exited with code {0}."
 }

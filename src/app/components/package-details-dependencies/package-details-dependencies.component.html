@@ -4,12 +4,12 @@
     i18n="@@packageDetails.dependencies.heading">Dependencies</div>
   @for (dependencyGroup of dependencyGroups; track dependencyGroup) {
   <div class="group mt-2">
-    <div class="group-name ml-3 text-xs font-medium text-vscode-foreground">{{ dependencyGroup.targetFramework }}</div>
+    <div class="group-name ml-3 break-all text-xs font-medium text-vscode-foreground">{{ dependencyGroup.targetFramework }}</div>
     @if (dependencyGroup.dependencies?.length) {
     @for (dependency of dependencyGroup.dependencies; track dependency) {
     <div class="dependency ml-6 flex flex-wrap gap-x-2 text-xs">
-      <span class="id font-medium">{{ dependency.id }}</span>
-      <span class="range text-vscode-muted">{{ dependency.range | versionRange }}</span>
+      <span class="id min-w-0 break-all font-medium">{{ dependency.id }}</span>
+      <span class="range min-w-0 break-all text-vscode-muted">{{ dependency.range | versionRange }}</span>
     </div>
     }
     } @else {

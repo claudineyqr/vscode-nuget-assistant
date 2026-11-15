@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as quickPick from './services/quick-pick';
+import { ProjectFileEditor, type PackageVersionUpdate } from './services/project-file-editor';
 
 import UiPanel from './ui-panel';
 
@@ -30,4 +31,30 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
+
+  // This command is registered only inside the VS Code extension test host. It lets
+  // integration tests exercise the production editor against real project files
+  // without adding a command to the extension's user-facing command palette.
+  if (context.extensionMode === vscode.ExtensionMode.Test) {
+    context.subscriptions.push(vscode.commands.registerCommand(
+      'nuget-assistant.test.applyProjectFileEdit',
+      (request: {
+        operation: 'apply' | 'applyMany';
+        projectPath: string;
+        packageId?: string;
+        version?: string;
+        updates?: PackageVersionUpdate[];
+      }) => {
+        const editor = new ProjectFileEditor();
+        if (request.operation === 'applyMany') {
+          editor.applyMany(request.projectPath, request.updates ?? []);
+          return;
+        }
+        if (!request.packageId) {
+          throw new Error('A package ID is required for a single project file edit.');
+        }
+        editor.apply(request.projectPath, request.packageId, request.version);
+      }
+    ));
+  }
 }

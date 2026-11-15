@@ -4,8 +4,7 @@
     <input class="vscode-checkbox" type="checkbox" [checked]="areAllSelected" (change)="selectAll($event)" />
     <span i18n="@@packageList.selectAll">Select all</span>
   </label>
-  <button
-    type="button"
+  <button type="button"
     class="button inline-flex h-7 min-w-20 select-none items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-medium text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
     (click)="updateSelected()" [disabled]="selectionService.isEmpty"
     i18n="@@packageList.updateSelected.button">Update</button>
@@ -15,9 +14,10 @@
 <section class="package-list flex min-h-0 flex-col gap-1 overflow-y-auto py-1" aria-label="Packages"
   i18n-aria-label="@@packageList.accessibleLabel">
   @for (package of packages; track package) {
-  <app-package-row [package]="package" [isActive]="package.id === currentSelectedPackageId"
-    [hideOperationButtons]="isSolutionMode"
-    [isSelected]="selectionService.isSelected(package)" [showSelectionCheckbox]="showSelectCheckboxes"
+  <app-package-row [package]="package"
+    [isActive]="package.id === currentSelectedPackageId && package.sourceUrl === currentSelectedPackageSourceUrl"
+    [hideOperationButtons]="isSolutionMode" [isSelected]="selectionService.isSelected(package)"
+    [showSelectionCheckbox]="showSelectCheckboxes"
     (changeSelect)="$event ? selectRow(package) : deselectRow(package)"></app-package-row>
   }
 </section>

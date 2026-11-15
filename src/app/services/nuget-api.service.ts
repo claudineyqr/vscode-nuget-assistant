@@ -63,7 +63,7 @@ export class NuGetApiService {
         api.protocol === 'v2'
           ? this.searchV2(query, prerelease, source, api.endpoint)
           : this.executeSearch(query, prerelease, api.endpoint!, requestHeaders, source.url).pipe(
-              map((results) => this.mapSearchResultsToPackageRows(results.data, source.url))
+              map((results) => this.mapSearchResultsToPackageRows(results.data, source.url, source.name))
             )
       ),
       catchError((error: unknown) => {
@@ -77,7 +77,7 @@ export class NuGetApiService {
 
   public searchAll(query: string, prerelease: boolean, sources: PackageSource[]): Observable<PackageRowModel[]> {
     return forkJoin(sources.map((source) => this.search(query, prerelease, source).pipe(catchError(() => of([]))))).pipe(
-      map((results) => this.mergeSearchResults(results))
+      map((results) => this.mergeBrowseSearchResults(results))
     );
   }
 
@@ -337,7 +337,7 @@ export class NuGetApiService {
         return Array.from(byId.values())
           .map((entry) => this.convertCatalogEntriesToPackageRow([entry], entry.id, source.url))
           .filter((row): row is PackageRowModel => row !== null)
-          .sort((left, right) => left.id.localeCompare(right.id));
+          .map((row) => ({ ...row, sourceName: source.name }));
       })
     );
   }
@@ -502,6 +502,7 @@ export class NuGetApiService {
   private mapSearchResultsToPackageRows(
     packageSearchResults: PackageSearchResult[],
     sourceUrl: string,
+    sourceName: string,
     versions: CatalogEntry[] | undefined = undefined
   ): PackageRowModel[] {
     return packageSearchResults.map((result) => ({
@@ -509,9 +510,21 @@ export class NuGetApiService {
       isInstalled: false,
       installedVersion: '',
       isOutdated: false,
+      sourceName,
       sourceUrl,
       versions,
     }));
+  }
+
+  private mergeBrowseSearchResults(results: PackageRowModel[][]): PackageRowModel[] {
+    const uniqueResults = new Map<string, PackageRowModel>();
+    results.flat().forEach((result) => {
+      const key = `${result.id.toLowerCase()}\u0000${result.sourceUrl}`;
+      if (!uniqueResults.has(key)) {
+        uniqueResults.set(key, result);
+      }
+    });
+    return Array.from(uniqueResults.values());
   }
 
   private mergeSearchResults(results: PackageRowModel[][]): PackageRowModel[] {

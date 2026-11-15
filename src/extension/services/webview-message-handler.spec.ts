@@ -178,6 +178,19 @@ describe('WebviewMessageHandler batched package operations', () => {
 
     expect(taskManager.executeTask).not.toHaveBeenCalled();
   });
+
+  it('ignores malformed messages and unknown commands', () => {
+    const taskManager = { executeTask: jest.fn(), cancelTasks: jest.fn() };
+    const handler = Object.assign(Object.create(WebviewMessageHandler.prototype), { taskManager }) as {
+      handleMessage(message: unknown): void;
+    };
+
+    expect(() => handler.handleMessage(null)).not.toThrow();
+    expect(() => handler.handleMessage({ command: 42 })).not.toThrow();
+    expect(() => handler.handleMessage({ command: 'unrecognized' })).not.toThrow();
+    expect(taskManager.executeTask).not.toHaveBeenCalled();
+    expect(taskManager.cancelTasks).not.toHaveBeenCalled();
+  });
 });
 
 describe('WebviewMessageHandler project-file package operations', () => {
@@ -455,6 +468,32 @@ describe('WebviewMessageHandler project-file package operations', () => {
     const args = handler.createTask.mock.calls[0][1] as Array<string | { value: string }>;
     expect(args.map((arg) => typeof arg === 'string' ? arg : arg.value)).toEqual(expect.arrayContaining(['add', 'package', 'Contoso.Widget']));
     expect(taskManager.executeTask.mock.calls[0][1]).toEqual({ action: 'install', packageId: 'Contoso.Widget' });
+  });
+
+  it('routes a removal message to dotnet with the selected package and project', () => {
+    const { handler, taskManager } = makeHandler(ExecutionMode.Dotnet);
+
+    handler.handleMessage({ command: 'remove-package', packageId: 'Contoso.Widget', projectName: projectPath });
+
+    expect(handler.createTask).toHaveBeenCalledWith('remove', expect.arrayContaining([
+      'remove', expect.objectContaining({ value: projectPath }), 'package', expect.objectContaining({ value: 'Contoso.Widget' }),
+    ]));
+    expect(taskManager.executeTask).toHaveBeenCalledWith(
+      expect.anything(),
+      { action: 'remove', packageId: 'Contoso.Widget' }
+    );
+  });
+
+  it.each([
+    ['invalid package identifier', { ...addMessage, packageId: '../Contoso.Widget' }],
+    ['unconfigured source', { ...addMessage, packageSourceUrl: 'https://other.example/v3/index.json' }],
+    ['invalid package version', { ...addMessage, packageVersion: 'not a version' }],
+  ])('does not schedule an add for %s', (_caseName, message) => {
+    const { handler, taskManager } = makeHandler(ExecutionMode.Dotnet);
+
+    handler.handleMessage({ command: 'add-package', ...message });
+
+    expect(taskManager.executeTask).not.toHaveBeenCalled();
   });
 
   it('uses dotnet when project-file mode targets a non-csproj file', () => {

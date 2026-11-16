@@ -235,7 +235,6 @@ describe('TaskManager package operation progress', () => {
 
   it('prepares queued tasks only when active and waits for process completion callbacks', async () => {
     let finishCallback: (() => void) | undefined;
-    let firstExecution: vscode.TaskExecution | undefined;
     const firstTask = { name: 'nuget-assistant' } as vscode.Task;
     const secondTask = { name: 'nuget-assistant' } as vscode.Task;
     const firstCallback = jest.fn((exitCode: number | undefined) => new Promise<void>((resolve) => {
@@ -252,7 +251,7 @@ describe('TaskManager package operation progress', () => {
 
     expect(firstFactory).toHaveBeenCalledTimes(1);
     expect(secondFactory).not.toHaveBeenCalled();
-    firstExecution = executions.get(firstTask);
+    const firstExecution = executions.get(firstTask);
     if (!firstExecution) {
       throw new Error('Task execution was not recorded.');
     }

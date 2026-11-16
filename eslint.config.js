@@ -1,7 +1,9 @@
-import { configs } from '@eslint/js';
+import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
-import { configs as _configs, processInlineTemplates } from 'angular-eslint';
+import { configs as _configs, createProcessor } from 'angular-eslint';
 import { configs as __configs } from 'typescript-eslint';
+
+const { configs } = eslint;
 
 export default defineConfig(
   {
@@ -10,7 +12,7 @@ export default defineConfig(
   {
     files: ['**/*.ts'],
     extends: [configs.recommended, ...__configs.recommended, ..._configs.tsRecommended],
-    processor: processInlineTemplates,
+    processor: createProcessor(),
     rules: {
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }],
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],

@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { NuGetHttpRequestMessage, UIMessage } from '../../shared/models/ui-message';
 import { formatErrorMessage } from '../../shared/utils/error-message';
 
-declare function acquireVsCodeApi(): any;
+declare function acquireVsCodeApi(): { postMessage(message: UIMessage): void };
 const vscode = acquireVsCodeApi();
 
 @Injectable({

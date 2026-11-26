@@ -57,6 +57,10 @@
       {
         "command": "nuget-assistant.manageSolutionPackagesPalette",
         "title": "%command.manageSolutionPackages%"
+      },
+      {
+        "command": "nuget-assistant.manageConfigurationsPalette",
+        "title": "%command.manageConfigurations%"
       }
     ],
     "menus": {
@@ -70,6 +74,9 @@
         },
         {
           "command": "nuget-assistant.manageSolutionPackagesPalette"
+        },
+        {
+          "command": "nuget-assistant.manageConfigurationsPalette"
         }
       ],
       "explorer/context": [

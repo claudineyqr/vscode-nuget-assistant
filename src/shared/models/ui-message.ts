@@ -1,5 +1,22 @@
+import { NuGetConfigSourceUpdate } from './nuget-config';
+
 export interface UIMessage {
   command: string;
+}
+
+export interface OpenNuGetConfigPageMessage extends UIMessage {
+  command: 'open-nuget-config-page';
+}
+
+export interface LoadNuGetConfigMessage extends UIMessage {
+  command: 'load-nuget-config';
+  filePath?: string;
+}
+
+export interface SaveNuGetConfigMessage extends UIMessage {
+  command: 'save-nuget-config';
+  filePath: string;
+  sources: NuGetConfigSourceUpdate[];
 }
 
 export interface SelectSourceMessage extends UIMessage {

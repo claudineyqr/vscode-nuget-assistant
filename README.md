@@ -7,6 +7,7 @@ Manage NuGet packages directly within Visual Studio Code through a modern graphi
 - Search, install, update, and remove NuGet packages without leaving VS Code
 - Manage packages across individual projects or entire solutions
 - Support for public and private package feeds
+- View and edit NuGet configuration files, including package sources and credentials
 - Built-in Central Package Management support
 - Package vulnerability detection and security advisory links
 - Cross-platform support: Windows, macOS, and Linux
@@ -28,7 +29,7 @@ To manage packages across an entire solution, right-click an `.sln` or `.slnx` f
 
 ### Command Palette
 
-You can also access all NuGet Assistant commands from the Command Palette (`Ctrl+Shift+P`) by searching for "NuGet Assistant".
+You can also access all NuGet Assistant commands from the Command Palette (`Ctrl+Shift+P`) by searching for "NuGet Assistant". Use **NuGet Assistant: Manage NuGet Configurations** to open the configurations page directly. The page manages the NuGet configuration files of the current user machine and does not require a project to be selected.
 
 ## Features
 
@@ -109,6 +110,16 @@ Sources are loaded from the following locations, in order:
 ### Project-Level Configuration
 
 - `NuGet.Config` files located in the project directory and any parent directories.
+
+### Editing Configuration Files
+
+Select the gear button next to the package source selector to manage the configuration file directly. This opens a separate **Nuget Assistant: Configurations** tab, independent of the package management page, where you can add, edit, remove, disable, and enable package sources, as well as configure credentials for private feeds. Use **Cancel** to discard unsaved edits and reload the file, or close the tab when you are finished.
+
+- Existing passwords are never sent to the editor; the password field can be left blank to keep the current value.
+- Changes are saved only to the selected file, and unrelated configuration sections are preserved.
+- Use the up/down arrows beside a source to change its order; the new order is saved to the configuration file.
+- `ClearTextPassword` is used for credentials, matching the format NuGet Assistant supports.
+- The selected file is created when it does not exist yet, such as a missing user configuration.
 
 ### Example
 

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as quickPick from './services/quick-pick';
 import { ProjectFileEditor } from './services/project-file-editor';
+import ConfigPanel from './config-panel';
 import UiPanel from './ui-panel';
 import { activate } from './extension';
 
@@ -56,6 +57,7 @@ describe('extension activation', () => {
 
   it('registers the project and solution commands and responds to language changes', () => {
     const reload = jest.spyOn(UiPanel, 'reloadAllForLanguageChange');
+    const reloadConfig = jest.spyOn(ConfigPanel, 'reloadAllForLanguageChange');
 
     activate(context);
 
@@ -64,13 +66,16 @@ describe('extension activation', () => {
       'nuget-assistant.managePackagesPalette',
       'nuget-assistant.manageSolutionPackages',
       'nuget-assistant.manageSolutionPackagesPalette',
+      'nuget-assistant.manageConfigurationsPalette',
     ]);
-    expect(context.subscriptions).toHaveLength(6);
+    expect(context.subscriptions).toHaveLength(7);
 
     configChanged?.({ affectsConfiguration: (section) => section === 'nuget-assistant.language' });
     expect(reload).toHaveBeenCalledTimes(1);
+    expect(reloadConfig).toHaveBeenCalledTimes(1);
     configChanged?.({ affectsConfiguration: () => false });
     expect(reload).toHaveBeenCalledTimes(1);
+    expect(reloadConfig).toHaveBeenCalledTimes(1);
   });
 
   it('opens a project or solution directly from the Explorer command', () => {
@@ -105,6 +110,16 @@ describe('extension activation', () => {
     expect(createOrShow).toHaveBeenCalledTimes(2);
     expect(createOrShow).toHaveBeenNthCalledWith(1, '/extension', project, expect.anything(), context.workspaceState);
     expect(createOrShow).toHaveBeenNthCalledWith(2, '/extension', solution, expect.anything(), context.workspaceState);
+  });
+
+  it('opens the NuGet configurations page from the command palette without a project', () => {
+    const createOrShow = jest.spyOn(ConfigPanel, 'createOrShow').mockReturnValue(undefined);
+
+    activate(context);
+    registeredCommands.get('nuget-assistant.manageConfigurationsPalette')?.();
+
+    expect(createOrShow).toHaveBeenCalledTimes(1);
+    expect(createOrShow).toHaveBeenCalledWith('/extension', outputChannel);
   });
 
   it('registers the project edit test command only in the extension test host', () => {

@@ -95,6 +95,12 @@ describe('UiPanel', () => {
     expect(readFile).toHaveBeenCalledWith(expect.stringContaining('dist'), { encoding: 'utf8' });
   });
 
+  it('wires the gear button to the configurations tab opener', () => {
+    UiPanel.createOrShow('/extension', { fsPath: '/repo/App.csproj' } as vscode.Uri, {} as vscode.OutputChannel, {} as vscode.Memento);
+
+    expect(jest.mocked(WebviewMessageHandler).mock.calls[0][4]).toEqual(expect.any(Function));
+  });
+
   it('reveals an existing panel for the same project and disposes its handler when closed', () => {
     const project = { fsPath: '/repo/App.csproj' } as vscode.Uri;
     const outputChannel = {} as vscode.OutputChannel;

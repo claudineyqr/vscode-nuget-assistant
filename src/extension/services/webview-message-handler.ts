@@ -68,7 +68,8 @@ export default class WebviewMessageHandler {
     private readonly webview: vscode.Webview,
     private readonly projectFilePath: string,
     private readonly outputChannel: vscode.OutputChannel,
-    private readonly workspaceState: vscode.Memento
+    private readonly workspaceState: vscode.Memento,
+    private readonly openNuGetConfigPage: () => void = () => undefined
   ) {
     this.projectFileLoader = new ProjectFileLoader();
     this.projectFileEditor = new ProjectFileEditor();
@@ -128,6 +129,9 @@ export default class WebviewMessageHandler {
         return;
       case 'reload-sources':
         this.loadConfiguration();
+        return;
+      case 'open-nuget-config-page':
+        this.openNuGetConfigPage();
         return;
       case 'select-source':
         this.cancelActiveNuGetRequests();

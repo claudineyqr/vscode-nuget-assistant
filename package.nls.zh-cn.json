@@ -2,6 +2,7 @@
   "capabilities.untrustedWorkspaces.description": "NuGet Assistant 会读取项目和包源配置文件，并执行 dotnet 包操作。",
   "command.manageProjectPackages": "NuGet Assistant: 管理项目包",
   "command.manageSolutionPackages": "NuGet Assistant: 管理解决方案包",
+  "command.manageConfigurations": "NuGet Assistant: 管理 NuGet 配置",
   "setting.allowInsecureHttpCredentials": "允许通过未加密的 HTTP 连接发送 NuGet 包源凭据。仅对受信任的包源和网络环境启用此选项。",
   "setting.packageExecutionMode": "用于安装、更新和卸载包的模式。",
   "setting.packageExecutionMode.dotnet": "使用 dotnet add/remove package 命令。",
@@ -36,5 +37,12 @@
   "error.restoreBatchOperation": "所选包更新 {0} 还原失败；所有项目文件更改均已回滚。{1}",
   "error.restoreBatchRollbackFailed": "所选包更新 {0} 还原失败，且回滚也失败：{1}",
   "error.restoreBatchSelectiveRollback": "包 {0} 还原失败；这些更新已回滚，其余所选更新已应用。{1}",
-  "error.restoreExitCode": "还原以代码 {0} 退出。"
+  "error.restoreExitCode": "还原以代码 {0} 退出。",
+  "error.nugetConfigFileNotAllowed": "无法编辑此 NuGet 配置文件。",
+  "error.nugetConfigInvalidData": "NuGet 配置数据无效。",
+  "error.nugetConfigSourceName": "包源名称“{0}”无效。",
+  "error.nugetConfigSourceUrl": "包源“{0}”的 URL 无效。",
+  "error.nugetConfigDuplicateSource": "已存在名为“{0}”的包源。",
+  "error.nugetConfigOriginalSourceNotFound": "在配置文件中找不到原始包源“{0}”。",
+  "error.nugetConfigCredentials": "包源“{0}”的凭据不完整或无效。"
 }

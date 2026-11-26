@@ -32,7 +32,7 @@ describe('AppComponent', () => {
         .overrideComponent(AppComponent, {
           set: {
             imports: [CommonModule],
-            template: '<output *ngIf="packageManager.currentPackageOperation | async as operation" class="package-operation flex items-center border-l-4" role="status" aria-live="polite" aria-atomic="true">{{ operation.action === "remove" ? "Uninstalling" : operation.action === "update" ? "Updating" : "Installing" }} {{ operation.packageId }}... <button type="button" aria-label="Cancel operation" (click)="cancelPackageOperation()">Cancel</button></output>',
+            template: '<div class="shell"></div>',
           },
         })
         .compileComponents();
@@ -122,47 +122,6 @@ describe('AppComponent', () => {
     expect(changeProject).toHaveBeenCalledWith(projectMessage.data);
     expect(packageManagerMock.refreshCurrentPackages).toHaveBeenCalledWith(true);
     expect(changeProject.mock.invocationCallOrder[0]).toBeLessThan(packageManagerMock.refreshCurrentPackages.mock.invocationCallOrder[0]);
-  });
-
-  test.each([
-    ['install', 'Installing'],
-    ['remove', 'Uninstalling'],
-    ['update', 'Updating'],
-  ] as const)('shows the %s operation with an accessible highlight and clears it after completion', (action, label) => {
-    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
-      data: { type: 'package-operation-progress', operation: { action, packageId: 'Newtonsoft.Json' } },
-    }));
-    fixture.detectChanges();
-
-    const operationIndicator = fixture.nativeElement.querySelector('output.package-operation[role="status"][aria-live="polite"][aria-atomic="true"]');
-    expect(operationIndicator).not.toBeNull();
-    expect(operationIndicator.textContent).toContain(`${label} Newtonsoft.Json...`);
-    expect(operationIndicator.classList).toContain('border-l-4');
-    const cancelButton = operationIndicator.querySelector('button[aria-label="Cancel operation"]') as HTMLButtonElement;
-    expect(cancelButton).not.toBeNull();
-    cancelButton.click();
-    expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
-
-    window.dispatchEvent(new MessageEvent<ExtensionMessage>('message', {
-      data: { type: 'package-operation-complete' },
-    }));
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('output.package-operation')).toBeNull();
-  });
-
-  test('forwards cancellation requests to the package manager', () => {
-    component.cancelPackageOperation();
-
-    expect(packageManagerMock.cancelCurrentPackageOperation).toHaveBeenCalledTimes(1);
-  });
-
-  test.each([
-    ['install', 'Installing'],
-    ['update', 'Updating'],
-    ['remove', 'Uninstalling'],
-  ] as const)('provides the %s operation label', (action, label) => {
-    expect(component.getOperationLabel(action)).toBe(label);
   });
 
   test('tracks package operation progress and clears it on completion', () => {

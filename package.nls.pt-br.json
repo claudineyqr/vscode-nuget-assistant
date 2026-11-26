@@ -2,6 +2,7 @@
   "capabilities.untrustedWorkspaces.description": "O NuGet Assistant lê arquivos de projeto e de configuração de fontes e executa operações dotnet em pacotes.",
   "command.manageProjectPackages": "NuGet Assistant: Gerenciar pacotes do projeto",
   "command.manageSolutionPackages": "NuGet Assistant: Gerenciar pacotes da solução",
+  "command.manageConfigurations": "NuGet Assistant: Gerenciar configurações do NuGet",
   "setting.allowInsecureHttpCredentials": "Permite enviar credenciais de fontes NuGet por conexões HTTP sem criptografia. Habilite somente para fontes e redes confiáveis.",
   "setting.packageExecutionMode": "Modo usado para instalar, atualizar e desinstalar pacotes.",
   "setting.packageExecutionMode.dotnet": "Usa os comandos dotnet add/remove package.",
@@ -36,5 +37,12 @@
   "error.restoreBatchOperation": "A restauração das atualizações selecionadas {0} falhou; todas as alterações nos arquivos do projeto foram revertidas. {1}",
   "error.restoreBatchRollbackFailed": "A restauração das atualizações selecionadas {0} falhou e o rollback também falhou: {1}",
   "error.restoreBatchSelectiveRollback": "A restauração de {0} falhou; essas atualizações foram revertidas e as demais selecionadas foram aplicadas. {1}",
-  "error.restoreExitCode": "A restauração terminou com o código {0}."
+  "error.restoreExitCode": "A restauração terminou com o código {0}.",
+  "error.nugetConfigFileNotAllowed": "Este arquivo de configuração do NuGet não pode ser editado.",
+  "error.nugetConfigInvalidData": "Os dados de configuração do NuGet são inválidos.",
+  "error.nugetConfigSourceName": "O nome da origem de pacotes \"{0}\" não é válido.",
+  "error.nugetConfigSourceUrl": "A URL da origem de pacotes \"{0}\" não é válida.",
+  "error.nugetConfigDuplicateSource": "Já existe uma origem de pacotes com o nome \"{0}\".",
+  "error.nugetConfigOriginalSourceNotFound": "A origem de pacotes original \"{0}\" não foi encontrada no arquivo de configuração.",
+  "error.nugetConfigCredentials": "As credenciais da origem de pacotes \"{0}\" estão incompletas ou são inválidas."
 }

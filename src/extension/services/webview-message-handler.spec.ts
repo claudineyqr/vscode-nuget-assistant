@@ -712,6 +712,57 @@ describe('WebviewMessageHandler startup flow', () => {
       }
     }
   });
+
+  it('opens the configurations page when the gear command is received', () => {
+    const descriptors = [
+      [vscode.workspace, 'getConfiguration'],
+      [vscode.workspace, 'onDidChangeConfiguration'],
+      [vscode.tasks, 'onDidEndTask'],
+    ] as const;
+    const originals = descriptors.map(([target, key]) => [target, key, Object.getOwnPropertyDescriptor(target, key)] as const);
+    let receiveMessage: ((message: unknown) => void) | undefined;
+    const webview = {
+      postMessage: jest.fn(),
+      onDidReceiveMessage: jest.fn((callback: (message: unknown) => void) => { receiveMessage = callback; }),
+    };
+    const openConfigurations = jest.fn();
+
+    Object.defineProperty(vscode.workspace, 'getConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ get: (_key: string, fallback: unknown) => fallback })),
+    });
+    Object.defineProperty(vscode.workspace, 'onDidChangeConfiguration', {
+      configurable: true,
+      value: jest.fn(() => ({ dispose: jest.fn() })),
+    });
+    Object.defineProperty(vscode.tasks, 'onDidEndTask', {
+      configurable: true,
+      value: jest.fn(() => ({ dispose: jest.fn() })),
+    });
+
+    try {
+      const handler = new WebviewMessageHandler(
+        webview as never,
+        '/repo/App.csproj',
+        { appendLine: jest.fn() } as never,
+        { get: jest.fn(() => undefined), update: jest.fn() } as never,
+        openConfigurations
+      );
+
+      receiveMessage?.({ command: 'open-nuget-config-page' });
+
+      expect(openConfigurations).toHaveBeenCalledTimes(1);
+      handler.dispose();
+    } finally {
+      for (const [target, key, descriptor] of originals) {
+        if (descriptor) {
+          Object.defineProperty(target, key, descriptor);
+        } else {
+          Reflect.deleteProperty(target, key);
+        }
+      }
+    }
+  });
 });
 
 describe('WebviewMessageHandler NuGet HTTP message flow', () => {

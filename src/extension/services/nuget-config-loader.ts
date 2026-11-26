@@ -9,6 +9,14 @@ import { localize } from './localization';
 
 type FileSystem = Pick<typeof fs.promises, 'readFile' | 'readdir'>;
 
+export type NuGetConfigFileKind = 'user' | 'additional' | 'project';
+
+export interface NuGetConfigFileCandidate {
+  path: string;
+  kind: NuGetConfigFileKind;
+  exists: boolean;
+}
+
 type NuGetConfig = {
   configuration?: {
     packageSources?: Array<{ add?: Array<XmlEntry>; clear?: unknown[]; remove?: Array<XmlEntry> }>;
@@ -82,38 +90,67 @@ export default class NuGetConfigLoader {
       });
   }
 
-  private async getConfigPathsAsync(projectFilePath: string): Promise<string[]> {
-    const paths: string[] = [];
+  public async getConfigFileCandidatesAsync(projectFilePath?: string): Promise<NuGetConfigFileCandidate[]> {
+    const candidates: NuGetConfigFileCandidate[] = [];
     const userConfigRoot = this.environment['APPDATA'] || this.environment['HOME'] || os.homedir();
     const userNuGetFolder = this.environment['APPDATA']
       ? path.join(userConfigRoot, 'NuGet')
       : path.join(userConfigRoot, '.nuget', 'NuGet');
 
     const userConfigPath = await this.findFileAsync(userNuGetFolder, 'NuGet.Config');
-    if (userConfigPath) {
-      paths.push(userConfigPath);
-    }
+    candidates.push({
+      path: userConfigPath ?? path.join(userNuGetFolder, 'NuGet.Config'),
+      kind: 'user',
+      exists: userConfigPath !== undefined,
+    });
 
     const additionalConfigFolder = path.join(userNuGetFolder, 'config');
-    paths.push(...(await this.findConfigFilesAsync(additionalConfigFolder)));
-
-    const projectFolder = path.dirname(projectFilePath);
-    const ancestorFolders: string[] = [];
-    let currentFolder = projectFolder;
-    while (true) {
-      ancestorFolders.unshift(currentFolder);
-      const parentFolder = path.dirname(currentFolder);
-      if (parentFolder === currentFolder) {
-        break;
-      }
-      currentFolder = parentFolder;
+    for (const configPath of await this.findConfigFilesAsync(additionalConfigFolder)) {
+      candidates.push({ path: configPath, kind: 'additional', exists: true });
     }
 
-    const ancestorConfigPaths = await Promise.all(
-      ancestorFolders.map((folder) => this.findFileAsync(folder, 'NuGet.Config'))
-    );
-    paths.push(...ancestorConfigPaths.filter((configPath): configPath is string => configPath !== undefined));
-    return paths;
+    if (projectFilePath) {
+      const projectFolder = path.dirname(projectFilePath);
+      const ancestorFolders: string[] = [];
+      let currentFolder = projectFolder;
+      while (true) {
+        ancestorFolders.unshift(currentFolder);
+        const parentFolder = path.dirname(currentFolder);
+        if (parentFolder === currentFolder) {
+          break;
+        }
+        currentFolder = parentFolder;
+      }
+
+      const ancestorConfigPaths = await Promise.all(
+        ancestorFolders.map((folder) => this.findFileAsync(folder, 'NuGet.Config'))
+      );
+      for (const configPath of ancestorConfigPaths) {
+        if (configPath) {
+          candidates.push({ path: configPath, kind: 'project', exists: true });
+        }
+      }
+    }
+    return this.dedupeConfigCandidates(candidates);
+  }
+
+  private async getConfigPathsAsync(projectFilePath: string): Promise<string[]> {
+    return (await this.getConfigFileCandidatesAsync(projectFilePath))
+      .filter((candidate) => candidate.exists)
+      .map((candidate) => candidate.path);
+  }
+
+  private dedupeConfigCandidates(candidates: NuGetConfigFileCandidate[]): NuGetConfigFileCandidate[] {
+    const seen = new Set<string>();
+    return candidates.filter((candidate) => {
+      const resolved = path.resolve(candidate.path);
+      const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   private async findConfigFilesAsync(folder: string): Promise<string[]> {

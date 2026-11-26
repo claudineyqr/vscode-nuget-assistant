@@ -61,6 +61,10 @@ export class ToolBarComponent extends BaseComponent implements OnInit {
     this.vscodeService.postMessage({ command: 'reload-sources' });
   }
 
+  public manageNuGetConfig(): void {
+    this.packageManager.openNuGetConfig();
+  }
+
   private listenForSourcesChanges(): void {
     this.subscriptions.add(
       this.packageManager.currentSources.subscribe((newSources) => {

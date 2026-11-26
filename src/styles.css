@@ -52,7 +52,9 @@
     color-scheme: dark;
   }
 
-  app-root {
+  app-root,
+  app-package-workspace,
+  app-nuget-config-page {
     display: block;
     width: 100%;
     height: 100%;

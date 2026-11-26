@@ -1016,6 +1016,12 @@ describe('PackageManagerService', () => {
     expect(vscodeServiceMock.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'add-packages' }));
   });
 
+  test('asks the extension to open the configurations page in a new tab', () => {
+    service.openNuGetConfig();
+
+    expect(vscodeServiceMock.postMessage).toHaveBeenCalledWith({ command: 'open-nuget-config-page' });
+  });
+
   function getMockCatalogEntry(id: string, version: string): CatalogEntry {
     return {
       '@id': '',

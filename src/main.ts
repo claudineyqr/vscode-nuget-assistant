@@ -1,6 +1,7 @@
 import { LOCALE_ID, enableProdMode, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
-import { registerLocaleData } from '@angular/common';
+import { LocationStrategy, registerLocaleData } from '@angular/common';
 import { bootstrapApplication } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
 import { FaIconLibrary } from '@fortawesome/angular-fontawesome';
 import { fas } from '@fortawesome/free-solid-svg-icons';
 import { provideHttpClient } from '@angular/common/http';
@@ -10,6 +11,8 @@ import localeZh from '@angular/common/locales/zh';
 import portugueseTranslations from './app/i18n/messages.pt-BR.json';
 import chineseTranslations from './app/i18n/messages.zh-CN.json';
 import { AppComponent } from './app/app.component';
+import { appRoutes } from './app/app.routes';
+import { WEBVIEW_INITIAL_ROUTE, WebviewLocationStrategy } from './app/webview-location.strategy';
 import { environment } from './environments/environment';
 
 registerLocaleData(localePt, 'pt-BR');
@@ -27,10 +30,16 @@ if (environment.production) {
   enableProdMode();
 }
 
+const requestedRoute = document.querySelector<HTMLMetaElement>('meta[name="nuget-assistant-route"]')?.content;
+const initialRoute = requestedRoute === 'configurations' ? '/configurations' : '/packages';
+
 bootstrapApplication(AppComponent, {
   providers: [
     provideZoneChangeDetection(),
     provideHttpClient(),
+    provideRouter(appRoutes),
+    { provide: LocationStrategy, useClass: WebviewLocationStrategy },
+    { provide: WEBVIEW_INITIAL_ROUTE, useValue: initialRoute },
     { provide: LOCALE_ID, useValue: activeLocale },
     provideAppInitializer(() => inject(FaIconLibrary).addIconPacks(fas)),
   ],

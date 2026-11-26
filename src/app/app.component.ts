@@ -1,40 +1,21 @@
-import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener } from '@angular/core';
-import { AngularSplitModule } from 'angular-split';
+import { RouterOutlet } from '@angular/router';
 
 import { ExtensionMessage } from '../shared/models/extension-message';
 import { PackageSource } from '../shared/models/package-source';
 import { Project, ProjectSet } from '../shared/models/project';
 import { PackageManagerService } from './services/package-manager.service';
-import { NavBarComponent } from './components/nav-bar/nav-bar.component';
-import { ToolBarComponent } from './components/tool-bar/tool-bar.component';
-import { PackageListComponent } from './components/package-list/package-list.component';
-import { PackageDetailsComponent } from './components/package-details/package-details.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [AsyncPipe, AngularSplitModule, NavBarComponent, ToolBarComponent, PackageListComponent, PackageDetailsComponent],
+  imports: [RouterOutlet],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
 })
 export class AppComponent {
   constructor(public packageManager: PackageManagerService) {}
-
-  public getOperationLabel(action: 'install' | 'update' | 'remove'): string {
-    if (action === 'remove') {
-      return $localize`:@@operation.uninstalling:Uninstalling`;
-    }
-    if (action === 'update') {
-      return $localize`:@@operation.updating:Updating`;
-    }
-    return $localize`:@@operation.installing:Installing`;
-  }
-
-  public cancelPackageOperation(): void {
-    this.packageManager.cancelCurrentPackageOperation();
-  }
 
   @HostListener('window:message', ['$event'])
   MessageFromExtension(event: MessageEvent<ExtensionMessage>) {

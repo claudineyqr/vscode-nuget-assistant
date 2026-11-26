@@ -1,0 +1,116 @@
+﻿<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  <form
+    class="dialog flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-vscode-border bg-vscode-editor text-vscode-foreground shadow-2xl"
+    role="dialog" aria-modal="true" aria-labelledby="nuget-source-dialog-title"
+    [formGroup]="form" (ngSubmit)="saveSource.emit()">
+    <header class="flex items-start justify-between gap-3 border-b border-vscode-border px-4 py-3">
+      <h2 id="nuget-source-dialog-title" class="text-base font-semibold">
+        @if (isAdd) {
+        <span i18n="@@nugetConfig.form.addTitle">Add package source</span>
+        } @else {
+        <span i18n="@@nugetConfig.form.editTitle">Edit package source</span>
+        }
+      </h2>
+      <button type="button"
+        class="button secondary inline-flex size-8 shrink-0 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        (click)="cancelRequest.emit()" title="Close" i18n-title="@@nugetConfig.close"
+        aria-label="Close" i18n-aria-label="@@nugetConfig.close">
+        <fa-icon icon="times"></fa-icon>
+      </button>
+    </header>
+
+    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-vscode-muted" i18n="@@nugetConfig.form.name">Name</span>
+          <input
+            class="h-8 w-full rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground placeholder:text-vscode-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+            formControlName="name" placeholder="e.g. Private feed" i18n-placeholder="@@nugetConfig.form.namePlaceholder" />
+          @if (form.get('name')?.hasError('required') || form.get('name')?.hasError('invalidSourceName')) {
+          <span class="mt-1 block text-xs text-vscode-error" i18n="@@nugetConfig.error.nameRequired">Enter a name for the
+            package source.</span>
+          }
+          @if (form.get('name')?.hasError('duplicate')) {
+          <span class="mt-1 block text-xs text-vscode-error"
+            i18n="@@nugetConfig.error.nameDuplicate">A source with this name already exists.</span>
+          }
+        </label>
+        <label class="block min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-vscode-muted" i18n="@@nugetConfig.form.url">Source URL</span>
+          <input
+            class="h-8 w-full rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground placeholder:text-vscode-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+            formControlName="url" placeholder="https://nuget.example.com/v3/index.json"
+            i18n-placeholder="@@nugetConfig.form.urlPlaceholder" />
+          @if (form.get('url')?.hasError('required')) {
+          <span class="mt-1 block text-xs text-vscode-error" i18n="@@nugetConfig.error.urlRequired">Enter a source
+            URL.</span>
+          }
+          @if (form.get('url')?.hasError('invalidSourceUrl')) {
+          <span class="mt-1 block text-xs text-vscode-error" i18n="@@nugetConfig.error.urlInvalid">Enter a valid HTTP,
+            HTTPS, or file URL, or a local path.</span>
+          }
+        </label>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input class="vscode-checkbox" type="checkbox" formControlName="enabled" />
+        <span i18n="@@nugetConfig.form.enabled">Enabled in this file</span>
+      </label>
+
+      <fieldset class="rounded-md border border-vscode-border p-3">
+        <legend class="px-1 text-xs font-semibold text-vscode-muted"
+          i18n="@@nugetConfig.form.credentialsHeading">Credentials</legend>
+        <p class="mb-2 text-xs text-vscode-muted" i18n="@@nugetConfig.form.credentialsHint">
+          Passwords are stored as clear text in the NuGet configuration file. Use %VARIABLE% references for shared or
+          source-controlled files.
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="block min-w-0">
+            <span class="mb-1 block text-xs font-semibold text-vscode-muted"
+              i18n="@@nugetConfig.form.username">Username</span>
+            <input
+              class="h-8 w-full rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+              formControlName="username" autocomplete="off" />
+            @if (form.get('username')?.hasError('credentialsIncomplete')) {
+            <span class="mt-1 block text-xs text-vscode-error"
+              i18n="@@nugetConfig.error.credentialsIncomplete">Enter both a username and a password.</span>
+            }
+          </label>
+          <label class="block min-w-0">
+            <span class="mb-1 block text-xs font-semibold text-vscode-muted"
+              i18n="@@nugetConfig.form.password">Password</span>
+            <input
+              class="h-8 w-full rounded-md border border-vscode-input-border bg-vscode-input px-2 text-sm text-vscode-input-foreground placeholder:text-vscode-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+              type="password" formControlName="password" autocomplete="new-password"
+              [attr.placeholder]="hasPassword ? passwordKeepPlaceholder : passwordNewPlaceholder" />
+            @if (form.get('password')?.hasError('passwordRequired')) {
+            <span class="mt-1 block text-xs text-vscode-error" i18n="@@nugetConfig.error.passwordRequired">Enter a
+              password for these credentials.</span>
+            }
+          </label>
+        </div>
+        @if (hasPassword) {
+        <label class="mt-2 flex items-center gap-2 text-sm">
+          <input class="vscode-checkbox" type="checkbox" formControlName="removeCredentials" />
+          <span i18n="@@nugetConfig.form.removeCredentials">Remove stored credentials</span>
+        </label>
+        }
+      </fieldset>
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 border-t border-vscode-border px-4 py-3">
+      <button type="button"
+        class="button secondary inline-flex h-8 min-w-20 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary px-3 text-xs font-medium text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+        (click)="cancelRequest.emit()" i18n="@@nugetConfig.form.cancel">Cancel</button>
+      <button type="submit"
+        class="button inline-flex h-8 min-w-20 select-none items-center justify-center rounded-md bg-vscode-accent px-3 text-xs font-semibold text-vscode-button-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus">
+        @if (isAdd) {
+        <span i18n="@@nugetConfig.form.add">Add</span>
+        } @else {
+        <span i18n="@@nugetConfig.form.apply">Apply</span>
+        }
+      </button>
+    </footer>
+  </form>
+</div>
+

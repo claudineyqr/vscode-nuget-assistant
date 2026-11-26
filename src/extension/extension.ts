@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as quickPick from './services/quick-pick';
 import { ProjectFileEditor, type PackageVersionUpdate } from './services/project-file-editor';
 
+import ConfigPanel from './config-panel';
 import UiPanel from './ui-panel';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -10,6 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('nuget-assistant.language')) {
         UiPanel.reloadAllForLanguageChange();
+        ConfigPanel.reloadAllForLanguageChange();
       }
     }),
     vscode.commands.registerCommand('nuget-assistant.managePackages', (uri: vscode.Uri) => {
@@ -29,6 +31,9 @@ export function activate(context: vscode.ExtensionContext) {
       if (solutionFileUri) {
         UiPanel.createOrShow(context.extensionPath, solutionFileUri, outputChannel, context.workspaceState);
       }
+    }),
+    vscode.commands.registerCommand('nuget-assistant.manageConfigurationsPalette', () => {
+      ConfigPanel.createOrShow(context.extensionPath, outputChannel);
     })
   );
 

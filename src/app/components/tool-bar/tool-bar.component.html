@@ -46,6 +46,12 @@
       aria-label="Reload package sources" i18n-aria-label="@@toolbar.reloadSources.title">
       <fa-icon icon="sync-alt"></fa-icon>
     </button>
+    <button type="button"
+      class="button secondary inline-flex size-8 select-none items-center justify-center rounded-md border border-vscode-border bg-vscode-secondary text-sm text-vscode-secondary-foreground transition-colors motion-reduce:transition-none hover:bg-vscode-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-vscode-focus"
+      (click)="manageNuGetConfig()" title="Manage NuGet configuration" i18n-title="@@toolbar.manageNugetConfig.title"
+      aria-label="Manage NuGet configuration" i18n-aria-label="@@toolbar.manageNugetConfig.title">
+      <fa-icon icon="cog"></fa-icon>
+    </button>
   </div>
 </section>
 }

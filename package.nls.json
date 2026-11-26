@@ -2,6 +2,7 @@
   "capabilities.untrustedWorkspaces.description": "NuGet Assistant reads project and feed configuration files and runs dotnet package operations.",
   "command.manageProjectPackages": "NuGet Assistant: Manage Project Packages",
   "command.manageSolutionPackages": "NuGet Assistant: Manage Solution Packages",
+  "command.manageConfigurations": "NuGet Assistant: Manage NuGet Configurations",
   "setting.allowInsecureHttpCredentials": "Allow NuGet source credentials to be sent over unencrypted HTTP connections. Enable only for trusted package sources and network environments.",
   "setting.packageExecutionMode": "Mode used to install, update, and uninstall packages.",
   "setting.packageExecutionMode.dotnet": "Use dotnet add/remove package commands.",
@@ -36,5 +37,12 @@
   "error.restoreBatchOperation": "Restore failed for selected package updates {0}; all project file changes were rolled back. {1}",
   "error.restoreBatchRollbackFailed": "Restore failed for selected package updates {0}, and rollback also failed: {1}",
   "error.restoreBatchSelectiveRollback": "Restore failed for {0}; those updates were rolled back and the other selected updates were restored. {1}",
-  "error.restoreExitCode": "Restore exited with code {0}."
+  "error.restoreExitCode": "Restore exited with code {0}.",
+  "error.nugetConfigFileNotAllowed": "This NuGet configuration file cannot be edited.",
+  "error.nugetConfigInvalidData": "The NuGet configuration data is invalid.",
+  "error.nugetConfigSourceName": "The package source name \"{0}\" is not valid.",
+  "error.nugetConfigSourceUrl": "The URL for package source \"{0}\" is not valid.",
+  "error.nugetConfigDuplicateSource": "A package source named \"{0}\" already exists.",
+  "error.nugetConfigOriginalSourceNotFound": "The original package source \"{0}\" was not found in the configuration file.",
+  "error.nugetConfigCredentials": "The credentials for package source \"{0}\" are incomplete or invalid."
 }

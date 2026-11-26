@@ -7,7 +7,12 @@ import { CatalogEntry } from '../models/package-meta';
 import { PackageSource } from '../../shared/models/package-source';
 import { InstalledPackage, Project, ProjectSet } from '../../shared/models/project';
 import { PackageOperationStatus } from '../../shared/models/extension-message';
-import { InstallMessage, InstallPackagesMessage, UninstallMessage } from '../../shared/models/ui-message';
+import {
+  InstallMessage,
+  InstallPackagesMessage,
+  OpenNuGetConfigPageMessage,
+  UninstallMessage,
+} from '../../shared/models/ui-message';
 import { NuGetApiService } from './nuget-api.service';
 import { VscodeService } from './vscode.service';
 import { ALL_PACKAGE_SOURCES, NUGET_ORG } from '../models/constants';
@@ -300,6 +305,11 @@ export class PackageManagerService {
 
   public cancelCurrentPackageOperation(): void {
     this.vscodeService.postMessage({ command: 'cancel-package-operation' });
+  }
+
+  public openNuGetConfig(): void {
+    const message: OpenNuGetConfigPageMessage = { command: 'open-nuget-config-page' };
+    this.vscodeService.postMessage(message);
   }
 
   private mapPackageToInstallMessage(

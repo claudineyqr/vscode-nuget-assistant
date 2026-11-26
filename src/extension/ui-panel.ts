@@ -1,8 +1,8 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import ConfigPanel from './config-panel';
 import WebviewMessageHandler from './services/webview-message-handler';
-import { resolveAppLocale } from './services/locale';
+import { getWebviewHtml } from './webview-html';
 
 export default class UiPanel {
   public static readonly currentPanels: Record<string, UiPanel | undefined> = {};
@@ -73,7 +73,8 @@ export default class UiPanel {
       this.panel.webview,
       this.projectFileUri.fsPath,
       outputChannel,
-      workspaceState
+      workspaceState,
+      () => ConfigPanel.createOrShow(extensionPath, outputChannel)
     );
   }
 
@@ -92,35 +93,8 @@ export default class UiPanel {
     }
   }
 
-  private _getHtmlForWebview() {
-    const appDistPath = path.join(this.extensionPath, 'dist');
-    const appDistPathUri = vscode.Uri.file(appDistPath);
-
-    const baseUri = this.panel.webview.asWebviewUri(appDistPathUri);
-
-    const indexPath = path.join(appDistPath, 'index.html');
-
-    let indexHtml = fs.readFileSync(indexPath, { encoding: 'utf8' });
-
-    const csp = [
-      "default-src 'none'",
-      `img-src ${this.panel.webview.cspSource} https: data:`,
-      `style-src ${this.panel.webview.cspSource} 'unsafe-inline'`,
-      `script-src ${this.panel.webview.cspSource}`,
-      `font-src ${this.panel.webview.cspSource} https: data:`,
-      "connect-src 'none'",
-      `base-uri ${this.panel.webview.cspSource}`,
-      "form-action 'none'",
-      "object-src 'none'",
-    ].join('; ');
-
-    const languagePreference = vscode.workspace.getConfiguration('nuget-assistant').get<string>('language', 'auto');
-    const locale = resolveAppLocale(languagePreference, vscode.env.language);
-    indexHtml = indexHtml.replace('<html lang="en">', `<html lang="${locale}">`);
-    indexHtml = indexHtml.replace('<head>', `<head>\n  <meta name="nuget-assistant-locale" content="${locale}">\n  <meta http-equiv="Content-Security-Policy" content="${csp}">`);
-    indexHtml = indexHtml.replace('<base href="/">', `<base href="${String(baseUri)}/">`);
-
-    return indexHtml;
+  private _getHtmlForWebview(): string {
+    return getWebviewHtml(this.extensionPath, this.panel.webview, 'packages');
   }
 
   private reloadForLanguageChange(): void {
